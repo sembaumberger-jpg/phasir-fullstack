@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ImmoTrade</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="logo">ImmoTrade</div>
+    <nav class="nav">
+      <a href="#angebote">Angebote</a>
+      <a href="#favoriten">Favoriten</a>
+      <a href="#trade">Handeln</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero__copy">
+        <p class="eyebrow">Immobilien-Marktplatz</p>
+        <h1>Finden, vergleichen und direkt handeln</h1>
+        <p class="subtitle">Durchsuche geprüfte Angebote, prüfe Renditepotenziale und stelle Kaufanfragen mit einem Klick.</p>
+        <div class="hero__cta">
+          <a class="btn" href="#angebote">Zu den Angeboten</a>
+          <a class="btn btn--ghost" href="#trade">Schnellkauf starten</a>
+        </div>
+        <div class="metrics">
+          <div>
+            <strong>120+</strong>
+            <span>aktive Listings</span>
+          </div>
+          <div>
+            <strong>4,9 ★</strong>
+            <span>verifizierte Anbieter</span>
+          </div>
+          <div>
+            <strong>24h</strong>
+            <span>Durchschnittliche Antwort</span>
+          </div>
+        </div>
+      </div>
+      <div class="hero__card">
+        <div class="price-tag">Neu</div>
+        <img src="https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=80" alt="Modernes Loft" />
+        <div class="hero__card__body">
+          <h3>Skyline Loft</h3>
+          <p>145 m² • Frankfurt • 3,2% Mietrendite</p>
+          <div class="pill-row">
+            <span class="pill">Penthouse</span>
+            <span class="pill">Erstbezug</span>
+            <span class="pill">Smart Home</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="angebote">
+      <header class="panel__header">
+        <div>
+          <p class="eyebrow">Live-Angebote</p>
+          <h2>Filtern und vergleichen</h2>
+        </div>
+        <div class="filters">
+          <select id="filter-type">
+            <option value="">Typ</option>
+            <option value="Wohnung">Wohnung</option>
+            <option value="Haus">Haus</option>
+            <option value="Gewerbe">Gewerbe</option>
+          </select>
+          <select id="filter-location">
+            <option value="">Ort</option>
+            <option value="Berlin">Berlin</option>
+            <option value="München">München</option>
+            <option value="Hamburg">Hamburg</option>
+            <option value="Köln">Köln</option>
+          </select>
+          <select id="filter-price">
+            <option value="">Preisrahmen</option>
+            <option value="0-500000">bis 500k€</option>
+            <option value="500000-1000000">500k€ – 1M€</option>
+            <option value="1000000-99999999">über 1M€</option>
+          </select>
+          <select id="sort-select">
+            <option value="">Sortierung</option>
+            <option value="price-asc">Preis aufsteigend</option>
+            <option value="price-desc">Preis absteigend</option>
+            <option value="yield-desc">Rendite</option>
+          </select>
+        </div>
+      </header>
+      <div class="properties" id="property-grid"></div>
+    </section>
+
+    <section class="panel" id="favoriten">
+      <header class="panel__header">
+        <div>
+          <p class="eyebrow">Merkliste</p>
+          <h2>Favoriten & Due Diligence</h2>
+        </div>
+        <button class="btn btn--ghost" id="clear-favorites">Leeren</button>
+      </header>
+      <div class="favorites" id="favorites-list">
+        <p class="placeholder">Noch keine Favoriten. Füge Angebote hinzu, um sie hier zu vergleichen.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="trade">
+      <header class="panel__header">
+        <div>
+          <p class="eyebrow">Schnellkauf</p>
+          <h2>Kaufanfrage stellen</h2>
+        </div>
+      </header>
+      <form class="trade-form" id="trade-form">
+        <div class="form-row">
+          <label for="selected-property">Angebot</label>
+          <select id="selected-property" required></select>
+        </div>
+        <div class="form-row">
+          <label for="buyer-name">Ihr Name</label>
+          <input id="buyer-name" name="buyer-name" placeholder="Max Mustermann" required />
+        </div>
+        <div class="form-row">
+          <label for="buyer-mail">E-Mail</label>
+          <input id="buyer-mail" name="buyer-mail" type="email" placeholder="max@beispiel.de" required />
+        </div>
+        <div class="form-row">
+          <label for="offer">Gebot (EUR)</label>
+          <input id="offer" name="offer" type="number" min="50000" step="1000" required />
+        </div>
+        <div class="form-row">
+          <label for="notes">Kommentar</label>
+          <textarea id="notes" name="notes" rows="3" placeholder="Finanzierung bestätigt, gewünschter Notartermin ..."></textarea>
+        </div>
+        <button class="btn" type="submit">Anfrage senden</button>
+        <p class="form-feedback" id="trade-feedback" role="status"></p>
+      </form>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div>
+      <strong>ImmoTrade</strong>
+      <p>Digitale Plattform für geprüfte Wohn- und Gewerbeimmobilien.</p>
+    </div>
+    <div class="footer__links">
+      <a href="#">AGB</a>
+      <a href="#">Datenschutz</a>
+      <a href="#">Support</a>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
