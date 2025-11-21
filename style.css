@@ -24,6 +24,12 @@ body {
   min-height: 100vh;
 }
 
+pre,
+code {
+  font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+}
+
 main {
   max-width: 1200px;
   margin: 0 auto;
@@ -294,6 +300,41 @@ textarea {
   padding: 14px;
   border-radius: 12px;
   background: var(--card);
+}
+
+.api-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  gap: 8px;
+}
+
+.code {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  color: #e5e7eb;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+.pill.success {
+  border-color: rgba(74, 222, 128, 0.4);
+  color: #bbf7d0;
+}
+
+.pill.warning {
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #fcd34d;
 }
 
 .placeholder {
