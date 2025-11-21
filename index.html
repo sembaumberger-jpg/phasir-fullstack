@@ -3,151 +3,197 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ImmoTrade</title>
+  <title>Phasir – Smarte Immobilienwartung</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="topbar">
-    <div class="logo">ImmoTrade</div>
+    <div class="logo">Phasir</div>
     <nav class="nav">
-      <a href="#angebote">Angebote</a>
-      <a href="#favoriten">Favoriten</a>
-      <a href="#trade">Handeln</a>
+      <a href="#funktionen">Funktionen</a>
+      <a href="#haeuser">Demo-Häuser</a>
+      <a href="#api">API</a>
+      <a href="#stack">Stack</a>
     </nav>
   </header>
 
   <main>
     <section class="hero">
       <div class="hero__copy">
-        <p class="eyebrow">Immobilien-Marktplatz</p>
-        <h1>Finden, vergleichen und direkt handeln</h1>
-        <p class="subtitle">Durchsuche geprüfte Angebote, prüfe Renditepotenziale und stelle Kaufanfragen mit einem Klick.</p>
+        <p class="eyebrow">Wartung & Modernisierung</p>
+        <h1>Alle Immobilientermine im Blick – automatisch berechnet</h1>
+        <p class="subtitle">
+          Phasir ist die mobile App für Hausbesitzer, die Wartungsintervalle, Austauschzyklen und
+          Modernisierungen proaktiv plant. Hinterlege Daten zu Heizung, Dach, Fenstern & Rauchmeldern –
+          Phasir erinnert dich rechtzeitig und liefert klare Next Steps.
+        </p>
         <div class="hero__cta">
-          <a class="btn" href="#angebote">Zu den Angeboten</a>
-          <a class="btn btn--ghost" href="#trade">Schnellkauf starten</a>
+          <a class="btn" href="#haeuser">Demo ansehen</a>
+          <a class="btn btn--ghost" href="#api">API erkunden</a>
         </div>
         <div class="metrics">
           <div>
-            <strong>120+</strong>
-            <span>aktive Listings</span>
+            <strong>4 Kernmodule</strong>
+            <span>Erfassen, Planen, Erinnern, Analysieren</span>
           </div>
           <div>
-            <strong>4,9 ★</strong>
-            <span>verifizierte Anbieter</span>
+            <strong>Automatisch</strong>
+            <span>Nächste Wartungstermine pro Gewerk</span>
           </div>
           <div>
-            <strong>24h</strong>
-            <span>Durchschnittliche Antwort</span>
+            <strong>Cross-Platform</strong>
+            <span>React Native + Expo</span>
           </div>
         </div>
       </div>
       <div class="hero__card">
-        <div class="price-tag">Neu</div>
-        <img src="https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=80" alt="Modernes Loft" />
+        <div class="price-tag">Smart Reminder</div>
+        <img src="https://images.unsplash.com/photo-1464316325666-63beaf639dbb?auto=format&fit=crop&w=1400&q=80" alt="Hauswartung" />
         <div class="hero__card__body">
-          <h3>Skyline Loft</h3>
-          <p>145 m² • Frankfurt • 3,2% Mietrendite</p>
+          <h3>Nächste Fälligkeiten</h3>
+          <p>Heizung in 8 Monaten • Rauchmelder in 30 Tagen • Dach in 3 Jahren</p>
           <div class="pill-row">
-            <span class="pill">Penthouse</span>
-            <span class="pill">Erstbezug</span>
-            <span class="pill">Smart Home</span>
+            <span class="pill">Push Notification</span>
+            <span class="pill">Intervall-Logik</span>
+            <span class="pill">Timeline</span>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="panel" id="angebote">
+    <section class="panel" id="funktionen">
       <header class="panel__header">
         <div>
-          <p class="eyebrow">Live-Angebote</p>
-          <h2>Filtern und vergleichen</h2>
-        </div>
-        <div class="filters">
-          <select id="filter-type">
-            <option value="">Typ</option>
-            <option value="Wohnung">Wohnung</option>
-            <option value="Haus">Haus</option>
-            <option value="Gewerbe">Gewerbe</option>
-          </select>
-          <select id="filter-location">
-            <option value="">Ort</option>
-            <option value="Berlin">Berlin</option>
-            <option value="München">München</option>
-            <option value="Hamburg">Hamburg</option>
-            <option value="Köln">Köln</option>
-          </select>
-          <select id="filter-price">
-            <option value="">Preisrahmen</option>
-            <option value="0-500000">bis 500k€</option>
-            <option value="500000-1000000">500k€ – 1M€</option>
-            <option value="1000000-99999999">über 1M€</option>
-          </select>
-          <select id="sort-select">
-            <option value="">Sortierung</option>
-            <option value="price-asc">Preis aufsteigend</option>
-            <option value="price-desc">Preis absteigend</option>
-            <option value="yield-desc">Rendite</option>
-          </select>
+          <p class="eyebrow">Produktvision</p>
+          <h2>Was Phasir abdeckt</h2>
         </div>
       </header>
-      <div class="properties" id="property-grid"></div>
+      <div class="properties" id="feature-grid"></div>
     </section>
 
-    <section class="panel" id="favoriten">
+    <section class="panel" id="haeuser">
       <header class="panel__header">
         <div>
-          <p class="eyebrow">Merkliste</p>
-          <h2>Favoriten & Due Diligence</h2>
+          <p class="eyebrow">Demo-Daten</p>
+          <h2>Häuser, Wartungshistorie & nächste Termine</h2>
         </div>
-        <button class="btn btn--ghost" id="clear-favorites">Leeren</button>
       </header>
-      <div class="favorites" id="favorites-list">
-        <p class="placeholder">Noch keine Favoriten. Füge Angebote hinzu, um sie hier zu vergleichen.</p>
+      <div class="properties" id="house-grid"></div>
+    </section>
+
+    <section class="panel" id="api">
+      <header class="panel__header">
+        <div>
+          <p class="eyebrow">Backend API</p>
+          <h2>Node.js + Express + MongoDB</h2>
+        </div>
+      </header>
+      <div class="api-grid">
+        <article class="card">
+          <div class="card__body">
+            <div class="card__meta">
+              <h3>House Model (Mongoose)</h3>
+              <span class="badge">models/House.js</span>
+            </div>
+            <p class="muted">Struktur für Immobilie, letzte Wartungen und automatisch berechnete nächste Termine.</p>
+            <pre class="code">{
+  owner_name: String,
+  address: String,
+  build_year: Number,
+  heating_type: String,
+  heating_install_year: Number,
+  last_heating_service: Date,
+  roof_install_year: Number,
+  last_roof_check: Date,
+  window_install_year: Number,
+  last_smoke_check: Date,
+  next: {
+    heating: Date,
+    roof: Date,
+    windows: Date,
+    smoke_check: Date
+  }
+}</pre>
+          </div>
+        </article>
+        <article class="card">
+          <div class="card__body">
+            <div class="card__meta">
+              <h3>REST-Endpunkte</h3>
+              <span class="badge">api/index.js</span>
+            </div>
+            <ul class="list">
+              <li><strong>POST /houses</strong> – neues Haus anlegen, nächste Termine berechnen</li>
+              <li><strong>GET /houses</strong> – alle Häuser des Nutzers</li>
+              <li><strong>GET /houses/:id</strong> – Details inkl. Historie & Next</li>
+              <li><strong>PUT /houses/:id</strong> – Wartung aktualisieren, Next neu berechnen</li>
+            </ul>
+            <p class="muted">Intervall-Logik: Heizung 2 Jahre, Dach 4 Jahre, Fenster 15 Jahre, Rauchmelder jährlich.</p>
+          </div>
+        </article>
+        <article class="card">
+          <div class="card__body">
+            <div class="card__meta">
+              <h3>Push Notifications</h3>
+              <span class="badge">optional</span>
+            </div>
+            <p class="muted">Expo Notifications oder Firebase Cloud Messaging binden Geräte-Token an Nutzer und senden Erinnerungen, sobald ein Termin < 30 Tage entfernt ist.</p>
+            <p class="muted">Für Prototyp: Backend loggt Reminder und das Frontend zeigt Badges.</p>
+          </div>
+        </article>
       </div>
     </section>
 
-    <section class="panel" id="trade">
+    <section class="panel" id="stack">
       <header class="panel__header">
         <div>
-          <p class="eyebrow">Schnellkauf</p>
-          <h2>Kaufanfrage stellen</h2>
+          <p class="eyebrow">Architektur</p>
+          <h2>Tech-Stack & Deliverables</h2>
         </div>
       </header>
-      <form class="trade-form" id="trade-form">
-        <div class="form-row">
-          <label for="selected-property">Angebot</label>
-          <select id="selected-property" required></select>
-        </div>
-        <div class="form-row">
-          <label for="buyer-name">Ihr Name</label>
-          <input id="buyer-name" name="buyer-name" placeholder="Max Mustermann" required />
-        </div>
-        <div class="form-row">
-          <label for="buyer-mail">E-Mail</label>
-          <input id="buyer-mail" name="buyer-mail" type="email" placeholder="max@beispiel.de" required />
-        </div>
-        <div class="form-row">
-          <label for="offer">Gebot (EUR)</label>
-          <input id="offer" name="offer" type="number" min="50000" step="1000" required />
-        </div>
-        <div class="form-row">
-          <label for="notes">Kommentar</label>
-          <textarea id="notes" name="notes" rows="3" placeholder="Finanzierung bestätigt, gewünschter Notartermin ..."></textarea>
-        </div>
-        <button class="btn" type="submit">Anfrage senden</button>
-        <p class="form-feedback" id="trade-feedback" role="status"></p>
-      </form>
+      <div class="properties">
+        <article class="card">
+          <div class="card__body">
+            <div class="card__meta">
+              <h3>Frontend</h3>
+              <span class="badge">React Native + Expo</span>
+            </div>
+            <p class="muted">Screens: Login/Signup, Dashboard, Haus-Detail, Haus-Formular, Wartungs-Timeline. Navigation via React Navigation.</p>
+            <p class="muted">State Management: React Context oder Zustand. Offline-first möglich mit SQLite als Alternative zu MongoDB.</p>
+          </div>
+        </article>
+        <article class="card">
+          <div class="card__body">
+            <div class="card__meta">
+              <h3>Backend</h3>
+              <span class="badge">Node.js + Express</span>
+            </div>
+            <p class="muted">api/index.js startet den Server, verbindet MongoDB via Mongoose und bietet CRUD-Endpunkte für Houses.</p>
+            <p class="muted">Service-Funktion berechnet next-Objekt beim Erstellen/Updaten.</p>
+          </div>
+        </article>
+        <article class="card">
+          <div class="card__body">
+            <div class="card__meta">
+              <h3>Datenbank</h3>
+              <span class="badge">MongoDB</span>
+            </div>
+            <p class="muted">Production: MongoDB Atlas; Dev: lokale Instanz oder SQLite/In-Memory-Fallback.</p>
+            <p class="muted">Collections: houses (owner, specs, last services, next), users (JWT für Auth).</p>
+          </div>
+        </article>
+      </div>
     </section>
   </main>
 
   <footer class="footer">
     <div>
-      <strong>ImmoTrade</strong>
-      <p>Digitale Plattform für geprüfte Wohn- und Gewerbeimmobilien.</p>
+      <strong>Phasir</strong>
+      <p>Die App, die Hausbesitzern Wartungen abnimmt und Modernisierungen planbar macht.</p>
     </div>
     <div class="footer__links">
-      <a href="#">AGB</a>
       <a href="#">Datenschutz</a>
+      <a href="#">AGB</a>
       <a href="#">Support</a>
     </div>
   </footer>
