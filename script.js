@@ -1,3 +1,5 @@
+const API_BASE = "http://localhost:4000";
+
 const features = [
   {
     title: "Login & Dashboard",
@@ -33,7 +35,7 @@ const features = [
   },
 ];
 
-const houses = [
+const fallbackHouses = [
   {
     id: "h1",
     name: "Stadtvilla Rheinblick",
@@ -75,6 +77,8 @@ const houses = [
   },
 ];
 
+let houseState = [...fallbackHouses];
+
 const featureGrid = document.getElementById("feature-grid");
 const houseGrid = document.getElementById("house-grid");
 
@@ -109,13 +113,13 @@ function formatDate(date) {
   return new Intl.DateTimeFormat("de-DE", { year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
 
+const toDate = (value) => (value instanceof Date ? value : new Date(value));
+
 function computeNext(house) {
-  const heatingBase = new Date(house.lastHeatingService);
-  const roofBase = house.lastRoofCheck
-    ? new Date(house.lastRoofCheck)
-    : new Date(`${house.roofInstallYear}-01-01`);
+  const heatingBase = toDate(house.lastHeatingService);
+  const roofBase = house.lastRoofCheck ? toDate(house.lastRoofCheck) : new Date(`${house.roofInstallYear}-01-01`);
   const windowBase = new Date(`${house.windowInstallYear}-01-01`);
-  const smokeBase = new Date(house.lastSmokeCheck);
+  const smokeBase = toDate(house.lastSmokeCheck);
 
   return {
     heating: addYears(heatingBase, 2),
@@ -137,10 +141,10 @@ function statusPill(days) {
   return '<span class="pill">OK</span>';
 }
 
-function renderHouses() {
+function renderHouses(list = houseState) {
   houseGrid.innerHTML = "";
-  houses.forEach((house) => {
-    const next = computeNext(house);
+  list.forEach((house) => {
+    const next = house.next || computeNext(house);
     const card = document.createElement("article");
     card.className = "card";
     card.innerHTML = `
@@ -152,26 +156,26 @@ function renderHouses() {
         </div>
         <p class="muted">${house.address} • Baujahr ${house.buildYear}</p>
         <div class="pill-row">
-          <span class="pill">Heizung: ${formatDate(next.heating)}</span>
-          ${statusPill(daysUntil(next.heating))}
+          <span class="pill">Heizung: ${formatDate(toDate(next.heating))}</span>
+          ${statusPill(daysUntil(toDate(next.heating)))}
         </div>
         <div class="pill-row">
-          <span class="pill">Dach: ${formatDate(next.roof)}</span>
-          ${statusPill(daysUntil(next.roof))}
+          <span class="pill">Dach: ${formatDate(toDate(next.roof))}</span>
+          ${statusPill(daysUntil(toDate(next.roof)))}
         </div>
         <div class="pill-row">
-          <span class="pill">Fenster: ${formatDate(next.windows)}</span>
-          ${statusPill(daysUntil(next.windows))}
+          <span class="pill">Fenster: ${formatDate(toDate(next.windows))}</span>
+          ${statusPill(daysUntil(toDate(next.windows)))}
         </div>
         <div class="pill-row">
-          <span class="pill">Rauchmelder: ${formatDate(next.smoke)}</span>
-          ${statusPill(daysUntil(next.smoke))}
+          <span class="pill">Rauchmelder: ${formatDate(toDate(next.smoke))}</span>
+          ${statusPill(daysUntil(toDate(next.smoke)))}
         </div>
       </div>
       <div class="card__footer">
         <div>
           <strong>Letzte Services</strong>
-          <div class="muted">Heizung ${formatDate(new Date(house.lastHeatingService))} • Rauchmelder ${formatDate(new Date(
+          <div class="muted">Heizung ${formatDate(toDate(house.lastHeatingService))} • Rauchmelder ${formatDate(toDate(
             house.lastSmokeCheck
           ))}</div>
         </div>
@@ -182,5 +186,58 @@ function renderHouses() {
   });
 }
 
+async function loadHouses() {
+  try {
+    const response = await fetch(`${API_BASE}/houses`);
+    if (!response.ok) throw new Error('API not reachable');
+    houseState = await response.json();
+  } catch (error) {
+    console.warn('API unreachable, falling back to static data', error);
+    houseState = fallbackHouses;
+  }
+  renderHouses();
+}
+
+function setupHouseForm() {
+  const form = document.getElementById('house-form');
+  const feedback = document.getElementById('house-feedback');
+  if (!form) return;
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    feedback.textContent = 'Speichere...';
+
+    const formData = new FormData(form);
+    const payload = Object.fromEntries(formData.entries());
+    if (!payload.lastRoofCheck) delete payload.lastRoofCheck;
+
+    try {
+      const response = await fetch(`${API_BASE}/houses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const message = await response.json();
+        throw new Error(message.error || 'Unbekannter Fehler');
+      }
+
+      const newHouse = await response.json();
+      houseState = [...houseState, newHouse];
+      renderHouses();
+      feedback.textContent = 'Haus gespeichert und Wartungen berechnet!';
+      form.reset();
+    } catch (error) {
+      console.error(error);
+      const fallbackHouse = { ...payload, id: `local-${Date.now()}` };
+      houseState = [...houseState, fallbackHouse];
+      renderHouses();
+      feedback.textContent = 'API nicht erreichbar – nutze lokalen Fallback.';
+    }
+  });
+}
+
 renderFeatures();
-renderHouses();
+setupHouseForm();
+loadHouses();

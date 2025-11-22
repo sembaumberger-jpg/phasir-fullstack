@@ -78,6 +78,54 @@
           <h2>Häuser, Wartungshistorie & nächste Termine</h2>
         </div>
       </header>
+      <form class="house-form" id="house-form">
+        <div class="form-grid">
+          <label class="form-row">
+            <span>Hausname</span>
+            <input name="name" type="text" placeholder="z. B. Rheinblick" required />
+          </label>
+          <label class="form-row">
+            <span>Adresse</span>
+            <input name="address" type="text" placeholder="Straße, Ort" required />
+          </label>
+          <label class="form-row">
+            <span>Baujahr</span>
+            <input name="buildYear" type="number" min="1800" max="2100" value="2015" required />
+          </label>
+          <label class="form-row">
+            <span>Heizungsart</span>
+            <input name="heatingType" type="text" placeholder="Gas, Wärmepumpe..." required />
+          </label>
+          <label class="form-row">
+            <span>Heizung Einbau</span>
+            <input name="heatingInstallYear" type="number" min="1900" max="2100" value="2020" required />
+          </label>
+          <label class="form-row">
+            <span>Letzter Heizungsservice</span>
+            <input name="lastHeatingService" type="date" required />
+          </label>
+          <label class="form-row">
+            <span>Dach Einbau</span>
+            <input name="roofInstallYear" type="number" min="1900" max="2100" value="2018" required />
+          </label>
+          <label class="form-row">
+            <span>Letzte Dachprüfung</span>
+            <input name="lastRoofCheck" type="date" />
+          </label>
+          <label class="form-row">
+            <span>Fenster Einbau</span>
+            <input name="windowInstallYear" type="number" min="1900" max="2100" value="2019" required />
+          </label>
+          <label class="form-row">
+            <span>Letzter Rauchmelder-Check</span>
+            <input name="lastSmokeCheck" type="date" required />
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="btn" type="submit">Haus anlegen</button>
+          <p class="form-feedback" id="house-feedback"></p>
+        </div>
+      </form>
       <div class="properties" id="house-grid"></div>
     </section>
 

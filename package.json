@@ -1,0 +1,19 @@
+{
+  "name": "phasir",
+  "version": "1.0.0",
+  "description": "Landing page prototype plus demo API for Phasir",
+  "type": "module",
+  "scripts": {
+    "start": "node api/index.js",
+    "dev": "nodemon api/index.js",
+    "test": "node -e \"console.log('ok')\""
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.3",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}
