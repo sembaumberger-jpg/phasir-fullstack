@@ -41,3 +41,13 @@ npm start
 
 - In Xcode: `swift-frontend/Package.swift` öffnen und das Schema **PhasirApp** auf einem iOS 17+ Simulator ausführen.
 - Alternativ im Terminal: `cd swift-frontend && swift run` (zeigt die SwiftUI-Previews/Logs, erfordert ein macOS/iOS Toolchain).
+
+## API Endpoints
+
+Die Express-API läuft standardmäßig auf Port 4000 und erwartet/liefert ISO8601-Datumswerte.
+
+- `GET /houses` – Liefert alle Häuser inkl. berechneter `next`-Wartungsdaten.
+- `POST /houses` – Legt ein Haus an. Pflichtfelder: `name`, `address`, `buildYear`, `heatingType`, `heatingInstallYear`, `lastHeatingService`, `roofInstallYear`, `windowInstallYear`, `lastSmokeCheck`. Optional: `ownerName`, `lastRoofCheck`.
+- `PUT /houses/:id` – Aktualisiert ein bestehendes Haus (gleiche Feldnamen wie POST). Gibt `404`, falls die ID nicht existiert.
+
+Alle Felder nutzen camelCase; auf Supabase werden die Spalten automatisch auf lowercase (`ownername`, `buildyear`, etc.) gemappt.
