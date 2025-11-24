@@ -9,6 +9,7 @@
     "test": "node -e \"console.log('ok')\""
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.84.0",
     "cors": "^2.8.5",
     "express": "^4.18.3",
     "uuid": "^9.0.1"
