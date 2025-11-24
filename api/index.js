@@ -1,8 +1,8 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import express from 'express';
 import cors from 'cors';
+import express from 'express';
 import { v4 as uuid } from 'uuid';
 import { createClient } from '@supabase/supabase-js';
 
@@ -119,21 +119,27 @@ const toSupabasePayload = (house) => {
     buildyear: normalized.buildYear,
     heatingtype: normalized.heatingType,
     heatinginstallyear: normalized.heatingInstallYear,
-    lastheatingservice: new Date(normalized.lastHeatingService).toISOString(),
+    lastheatingservice: normalized.lastHeatingService
+      ? new Date(normalized.lastHeatingService).toISOString()
+      : null,
     roofinstallyear: normalized.roofInstallYear,
     lastroofcheck: normalized.lastRoofCheck
       ? new Date(normalized.lastRoofCheck).toISOString()
       : null,
     windowinstallyear: normalized.windowInstallYear,
-    lastsmokecheck: new Date(normalized.lastSmokeCheck).toISOString(),
+    lastsmokecheck: normalized.lastSmokeCheck
+      ? new Date(normalized.lastSmokeCheck).toISOString()
+      : null,
   };
 };
 
 const ensureHouseDates = (house) => ({
   ...house,
-  lastHeatingService: new Date(house.lastHeatingService),
+  lastHeatingService: house.lastHeatingService
+    ? new Date(house.lastHeatingService)
+    : null,
   lastRoofCheck: house.lastRoofCheck ? new Date(house.lastRoofCheck) : null,
-  lastSmokeCheck: new Date(house.lastSmokeCheck),
+  lastSmokeCheck: house.lastSmokeCheck ? new Date(house.lastSmokeCheck) : null,
 });
 
 const normalizeHouse = (house) =>
@@ -159,11 +165,11 @@ const serializeHouse = (house) => {
   const normalized = normalizeHouse(house);
   return {
     ...normalized,
-    lastHeatingService: normalized.lastHeatingService.toISOString(),
+    lastHeatingService: normalized.lastHeatingService?.toISOString() ?? null,
     lastRoofCheck: normalized.lastRoofCheck
       ? normalized.lastRoofCheck.toISOString()
       : null,
-    lastSmokeCheck: normalized.lastSmokeCheck.toISOString(),
+    lastSmokeCheck: normalized.lastSmokeCheck?.toISOString() ?? null,
     next: computeNext(normalized),
   };
 };
@@ -185,7 +191,7 @@ const parseHousePayload = (payload) => ({
 // ---------- DB Funktionen ----------
 
 const fetchAllHouses = async () => {
-  if (!supabase) return houses;
+  if (!supabase) return houses.map(normalizeHouse);
 
   const { data, error } = await supabase.from(SUPABASE_TABLE).select('*');
   if (error) {
@@ -268,71 +274,74 @@ const updateHouseById = async (id, payload) => {
   return normalizeHouse(fromSupabaseRow(data));
 };
 
+// ---------- Helpers ----------
+
+const asyncRoute = (handler) => async (req, res) => {
+  try {
+    await handler(req, res);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 // ---------- Routes ----------
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', supabase: Boolean(supabase) });
 });
 
-app.get('/houses', async (_req, res) => {
-  try {
+app.get(
+  '/houses',
+  asyncRoute(async (_req, res) => {
     const result = await fetchAllHouses();
     res.json(result.map(serializeHouse));
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch houses' });
-  }
-});
+  })
+);
 
-app.get('/houses/:id', async (req, res) => {
-  try {
+app.get(
+  '/houses/:id',
+  asyncRoute(async (req, res) => {
     const house = await fetchHouseById(req.params.id);
     if (!house) return res.status(404).json({ error: 'House not found' });
     res.json(serializeHouse(house));
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch house' });
-  }
-});
+  })
+);
 
-app.post('/houses', async (req, res) => {
-  const required = [
-    'name',
-    'address',
-    'buildYear',
-    'heatingType',
-    'heatingInstallYear',
-    'lastHeatingService',
-    'roofInstallYear',
-    'windowInstallYear',
-    'lastSmokeCheck',
-  ];
-  const missing = required.filter((key) => !req.body?.[key]);
-  if (missing.length) {
-    return res.status(400).json({
-      error: `Missing fields: ${missing.join(', ')}`,
-    });
-  }
+app.post(
+  '/houses',
+  asyncRoute(async (req, res) => {
+    const required = [
+      'name',
+      'address',
+      'buildYear',
+      'heatingType',
+      'heatingInstallYear',
+      'lastHeatingService',
+      'roofInstallYear',
+      'windowInstallYear',
+      'lastSmokeCheck',
+    ];
+    const missing = required.filter((key) => !req.body?.[key]);
+    if (missing.length) {
+      return res.status(400).json({
+        error: `Missing fields: ${missing.join(', ')}`,
+      });
+    }
 
-  try {
     const house = await createHouse(req.body);
     res.status(201).json(serializeHouse(house));
-  } catch (error) {
-    console.error('🔴 createHouse route error:', error);
-    res.status(500).json({ error: 'Failed to create house' });
-  }
-});
+  })
+);
 
-app.put('/houses/:id', async (req, res) => {
-  try {
+app.put(
+  '/houses/:id',
+  asyncRoute(async (req, res) => {
     const house = await updateHouseById(req.params.id, req.body);
     if (!house) return res.status(404).json({ error: 'House not found' });
     res.json(serializeHouse(house));
-  } catch (error) {
-    console.error('🔴 updateHouse route error:', error);
-    res.status(500).json({ error: 'Failed to update house' });
-  }
-});
+  })
+);
 
 app.listen(PORT, () => {
   console.log(`Phasir API listening on http://localhost:${PORT}`);

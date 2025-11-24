@@ -2,7 +2,11 @@ import SwiftUI
 
 @main
 struct PhasirApp: App {
-    @StateObject private var service = HouseService(baseURL: URL(string: "http://localhost:4000")!)
+    private let service = HouseService(
+        apiService: ApiService(
+            baseURL: URL(string: "https://congenial-spoon-jjvjg5qg7q9qc5rq9-4000.app.github.dev")!
+        )
+    )
 
     var body: some Scene {
         WindowGroup {
