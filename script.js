@@ -2,14 +2,21 @@ const API_BASE = "http://localhost:4000";
 
 const features = [
   {
-    title: "Login & Dashboard",
+    title: "Login & Mobile Dashboard",
     description:
-      "JWT oder Dummy-Session, personalisierte Übersicht aller Häuser mit Kennzahlen zu fälligen Wartungen.",
-    tags: ["Auth", "Übersicht", "KPIs"],
+      "E-Mail + Passwort oder Magic Link, danach persönliches Dashboard mit allen eigenen Häusern und Wartungen.",
+    tags: ["Auth", "Personalisierung", "Mobile"],
+  },
+  {
+    title: "Handy-Datei-Safe",
+    description:
+      "Eigenen PDF- oder Foto-Nachweise pro Haus sicher ablegen. Zugriff nur nach Login, jede Datei bekommt einen Owner.",
+    tags: ["Secure Storage", "Files", "Owner-bound"],
   },
   {
     title: "Haus-Detail",
-    description: "Adresse, Baujahr, Heizungsart, Historie der letzten Services und nächste Termine für jedes Gewerk.",
+    description:
+      "Adresse, Baujahr, Heizungsart, Historie der letzten Services und nächste Termine für jedes Gewerk – optimiert für kleine Screens.",
     tags: ["Historie", "Next Steps", "Timeline"],
   },
   {
@@ -28,16 +35,12 @@ const features = [
     description: "Wartungs-Timeline und Budget-Preview als Chart (react-native-chart-kit oder Victory Native).",
     tags: ["Charts", "Budget", "Planung"],
   },
-  {
-    title: "IoT-ready",
-    description: "Architektur erlaubt spätere Sensor-Daten (WebSockets/REST) für Heizungs- oder Rauchmelderstatus.",
-    tags: ["IoT", "WebSocket", "Realtime"],
-  },
 ];
 
 const fallbackHouses = [
   {
     id: "h1",
+    ownerEmail: "lisa@phasir.app",
     name: "Stadtvilla Rheinblick",
     address: "Rheinufer 12, Köln",
     buildYear: 2008,
@@ -51,6 +54,7 @@ const fallbackHouses = [
   },
   {
     id: "h2",
+    ownerEmail: "tom@phasir.app",
     name: "Alpen Chalet",
     address: "Talweg 5, Garmisch",
     buildYear: 1995,
@@ -64,6 +68,7 @@ const fallbackHouses = [
   },
   {
     id: "h3",
+    ownerEmail: "mara@phasir.app",
     name: "Stadthaus Mitte",
     address: "Chausseestraße 21, Berlin",
     buildYear: 2012,
@@ -77,10 +82,43 @@ const fallbackHouses = [
   },
 ];
 
+const demoUsers = {
+  "lisa@phasir.app": {
+    name: "Lisa Rhein",
+    password: "demo123",
+    files: [
+      { name: "Heizung_Service_2023.pdf", type: "PDF", size: "380 KB" },
+      { name: "Energieausweis.png", type: "Bild", size: "1.1 MB" },
+    ],
+  },
+  "tom@phasir.app": {
+    name: "Tom Berger",
+    password: "demo123",
+    files: [
+      { name: "Dachcheck_2023.pdf", type: "PDF", size: "220 KB" },
+      { name: "SmartHome-Plan.jpg", type: "Bild", size: "890 KB" },
+    ],
+  },
+  "mara@phasir.app": {
+    name: "Mara Schulz",
+    password: "demo123",
+    files: [
+      { name: "Fensterrechnung.pdf", type: "PDF", size: "640 KB" },
+      { name: "Rauchmelder_Checkliste.docx", type: "Docx", size: "120 KB" },
+    ],
+  },
+};
+
+let sessionUser = null;
 let houseState = [...fallbackHouses];
 
 const featureGrid = document.getElementById("feature-grid");
 const houseGrid = document.getElementById("house-grid");
+const vaultGrid = document.getElementById("file-vault");
+const loginForm = document.getElementById("login-form");
+const loginFeedback = document.getElementById("login-feedback");
+const sessionBadge = document.getElementById("session-badge");
+const sessionLogout = document.getElementById("session-logout");
 
 function renderFeatures() {
   featureGrid.innerHTML = "";
@@ -143,6 +181,16 @@ function statusPill(days) {
 
 function renderHouses(list = houseState) {
   houseGrid.innerHTML = "";
+  if (!sessionUser) {
+    houseGrid.innerHTML = '<p class="muted placeholder">Melde dich an, um deine hinterlegten Häuser zu sehen.</p>';
+    return;
+  }
+
+  if (!list.length) {
+    houseGrid.innerHTML = '<p class="muted placeholder">Keine Häuser gefunden. Lege dein erstes Objekt an.</p>';
+    return;
+  }
+
   list.forEach((house) => {
     const next = house.next || computeNext(house);
     const card = document.createElement("article");
@@ -186,16 +234,78 @@ function renderHouses(list = houseState) {
   });
 }
 
+function renderVault(files = []) {
+  if (!vaultGrid) return;
+  vaultGrid.innerHTML = "";
+
+  if (!sessionUser) {
+    vaultGrid.innerHTML = '<p class="muted placeholder">Login erforderlich, um deinen Datei-Safe zu öffnen.</p>';
+    return;
+  }
+
+  if (!files.length) {
+    vaultGrid.innerHTML = '<p class="muted placeholder">Noch keine Dateien hochgeladen.</p>';
+    return;
+  }
+
+  files.forEach((file) => {
+    const card = document.createElement("article");
+    card.className = "card file-card";
+    card.innerHTML = `
+      <div class="card__body">
+        <div class="card__meta">
+          <h3>${file.name}</h3>
+          <span class="badge">${file.type}</span>
+        </div>
+        <p class="muted">${file.size} • Eigentümer: ${sessionUser.name}</p>
+        <div class="pill-row">
+          <span class="pill">Passwort geschützt</span>
+          <span class="pill">Mobile Ready</span>
+        </div>
+      </div>
+    `;
+    vaultGrid.appendChild(card);
+  });
+}
+
+function filterHousesForUser(user) {
+  if (!user) return [];
+  return houseState.filter((house) => {
+    if (house.ownerEmail) return house.ownerEmail === user.email;
+    if (house.ownerName && user.name) return house.ownerName.includes(user.name.split(" ")[0]);
+    return true;
+  });
+}
+
+function updateSessionUI() {
+  if (!sessionBadge || !sessionLogout) return;
+  if (sessionUser) {
+    sessionBadge.textContent = `${sessionUser.name} • ${sessionUser.email}`;
+    sessionBadge.classList.remove("hidden");
+    sessionLogout.classList.remove("hidden");
+  } else {
+    sessionBadge.textContent = "Nicht angemeldet";
+    sessionBadge.classList.add("hidden");
+    sessionLogout.classList.add("hidden");
+  }
+}
+
 async function loadHouses() {
   try {
     const response = await fetch(`${API_BASE}/houses`);
     if (!response.ok) throw new Error('API not reachable');
-    houseState = await response.json();
+    const apiHouses = await response.json();
+    houseState = apiHouses.map((house, index) => ({
+      ...house,
+      ownerEmail: fallbackHouses[index % fallbackHouses.length]?.ownerEmail ?? `api-user-${index}@phasir.app`,
+    }));
   } catch (error) {
     console.warn('API unreachable, falling back to static data', error);
     houseState = fallbackHouses;
   }
-  renderHouses();
+
+  const userHouses = filterHousesForUser(sessionUser);
+  renderHouses(userHouses);
 }
 
 function setupHouseForm() {
@@ -224,20 +334,61 @@ function setupHouseForm() {
       }
 
       const newHouse = await response.json();
+      newHouse.ownerEmail = sessionUser?.email ?? newHouse.ownerEmail;
       houseState = [...houseState, newHouse];
-      renderHouses();
+      renderHouses(filterHousesForUser(sessionUser));
       feedback.textContent = 'Haus gespeichert und Wartungen berechnet!';
       form.reset();
     } catch (error) {
       console.error(error);
-      const fallbackHouse = { ...payload, id: `local-${Date.now()}` };
+      const fallbackHouse = { ...payload, id: `local-${Date.now()}`, ownerEmail: sessionUser?.email };
       houseState = [...houseState, fallbackHouse];
-      renderHouses();
+      renderHouses(filterHousesForUser(sessionUser));
       feedback.textContent = 'API nicht erreichbar – nutze lokalen Fallback.';
     }
   });
 }
 
+function setupLogin() {
+  if (!loginForm || !loginFeedback) return;
+
+  loginForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    loginFeedback.textContent = 'Prüfe Zugang...';
+
+    const formData = new FormData(loginForm);
+    const email = String(formData.get('email') || '').toLowerCase();
+    const password = formData.get('password');
+    const user = demoUsers[email];
+
+    if (!user || user.password !== password) {
+      loginFeedback.textContent = 'Login fehlgeschlagen – nutze demo123 oder prüfe die E-Mail.';
+      return;
+    }
+
+    sessionUser = { email, name: user.name };
+    loginFeedback.textContent = `Eingeloggt als ${user.name}. Deine Daten sind geladen.`;
+    const userHouses = filterHousesForUser(sessionUser);
+    renderHouses(userHouses);
+    renderVault(user.files);
+    updateSessionUI();
+    loginForm.reset();
+  });
+
+  if (sessionLogout) {
+    sessionLogout.addEventListener('click', () => {
+      sessionUser = null;
+      loginFeedback.textContent = 'Abgemeldet.';
+      renderHouses();
+      renderVault();
+      updateSessionUI();
+    });
+  }
+}
+
 renderFeatures();
+setupLogin();
 setupHouseForm();
 loadHouses();
+renderVault();
+updateSessionUI();

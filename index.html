@@ -10,8 +10,10 @@
   <header class="topbar">
     <div class="logo">Phasir</div>
     <nav class="nav">
+      <a href="#app">App</a>
       <a href="#funktionen">Funktionen</a>
       <a href="#haeuser">Demo-Häuser</a>
+      <a href="#vault">Datei-Safe</a>
       <a href="#api">API</a>
       <a href="#stack">Stack</a>
     </nav>
@@ -21,11 +23,11 @@
     <section class="hero">
       <div class="hero__copy">
         <p class="eyebrow">Wartung & Modernisierung</p>
-        <h1>Alle Immobilientermine im Blick – automatisch berechnet</h1>
+        <h1>Alle Immobilientermine im Blick – jetzt als Handy-App</h1>
         <p class="subtitle">
-          Phasir ist die mobile App für Hausbesitzer, die Wartungsintervalle, Austauschzyklen und
-          Modernisierungen proaktiv plant. Hinterlege Daten zu Heizung, Dach, Fenstern & Rauchmeldern –
-          Phasir erinnert dich rechtzeitig und liefert klare Next Steps.
+          Phasir ist eine vollwertige Smartphone-App mit Login und Datei-Safe. Melde dich an, sieh nur deine Häuser
+          und sichere Nachweise im persönlichen Speicher. Wartungsintervalle, Austauschzyklen und Modernisierungen
+          werden automatisch berechnet.
         </p>
         <div class="hero__cta">
           <a class="btn" href="#haeuser">Demo ansehen</a>
@@ -47,15 +49,67 @@
         </div>
       </div>
       <div class="hero__card">
-        <div class="price-tag">Smart Reminder</div>
-        <img src="https://images.unsplash.com/photo-1464316325666-63beaf639dbb?auto=format&fit=crop&w=1400&q=80" alt="Hauswartung" />
+        <div class="price-tag">Mobile Login</div>
+        <img src="https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=1400&q=80" alt="Hauswartung" />
         <div class="hero__card__body">
-          <h3>Nächste Fälligkeiten</h3>
-          <p>Heizung in 8 Monaten • Rauchmelder in 30 Tagen • Dach in 3 Jahren</p>
+          <h3>Nur deine Häuser & Dateien</h3>
+          <p>Nach Login zeigt die App dein persönliches Dashboard und den Datei-Safe – ready für iOS & Android.</p>
           <div class="pill-row">
-            <span class="pill">Push Notification</span>
-            <span class="pill">Intervall-Logik</span>
+            <span class="pill">Passwort & Magic Link</span>
+            <span class="pill">Datei-Safe</span>
             <span class="pill">Timeline</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="app">
+      <header class="panel__header">
+        <div>
+          <p class="eyebrow">Smartphone Experience</p>
+          <h2>Login, Dateien & Dashboard – alles fürs Handy gedacht</h2>
+        </div>
+      </header>
+      <div class="app-grid">
+        <div class="phone">
+          <div class="phone__notch"></div>
+          <div class="phone__screen">
+            <div class="phone__status">
+              <span class="pill">Secure Session</span>
+              <span class="pill">Biometrie-ready</span>
+            </div>
+            <h3>Phasir Login</h3>
+            <p class="muted">Email + Passwort oder Magic Link. Danach nur deine Häuser & Dateien.</p>
+            <ul class="list">
+              <li>• JWT Session & Refresh Token</li>
+              <li>• Gerätebindung via Expo SecureStore</li>
+              <li>• Upload von PDF/Foto-Nachweisen</li>
+            </ul>
+            <div class="phone__cta">App öffnen</div>
+          </div>
+        </div>
+        <div class="login-card">
+          <h3>Login-Demo (Handy-Flow)</h3>
+          <p class="muted">Nutze die Demo-Zugangsdaten, um dein persönliches Dashboard zu entsperren.</p>
+          <form id="login-form" class="login-form">
+            <label class="form-row">
+              <span>E-Mail</span>
+              <input type="email" name="email" placeholder="z. B. lisa@phasir.app" required />
+            </label>
+            <label class="form-row">
+              <span>Passwort</span>
+              <input type="password" name="password" placeholder="demo123" required />
+            </label>
+            <button class="btn" type="submit">Anmelden</button>
+            <p class="form-feedback" id="login-feedback">Login schützt Häuser und Dateien.</p>
+          </form>
+          <div class="session-info">
+            <span id="session-badge" class="badge hidden">Nicht angemeldet</span>
+            <button id="session-logout" class="btn btn--ghost hidden" type="button">Logout</button>
+          </div>
+          <div class="vault-hint">
+            <strong>Datei-Safe</strong>
+            <p class="muted">Nach Login siehst du nur Dateien, die zu deinem Account gehören.</p>
           </div>
         </div>
       </div>
@@ -77,6 +131,7 @@
           <p class="eyebrow">Demo-Daten</p>
           <h2>Häuser, Wartungshistorie & nächste Termine</h2>
         </div>
+        <p class="muted">Anmeldung im Abschnitt "App" schaltet dein persönliches Dashboard frei.</p>
       </header>
       <form class="house-form" id="house-form">
         <div class="form-grid">
@@ -127,6 +182,21 @@
         </div>
       </form>
       <div class="properties" id="house-grid"></div>
+    </section>
+
+    <section class="panel" id="vault">
+      <header class="panel__header">
+        <div>
+          <p class="eyebrow">Datei-Safe</p>
+          <h2>Nur angemeldete Nutzer sehen ihre Nachweise</h2>
+        </div>
+        <div class="pill-row">
+          <span class="pill">AES-256 verschlüsselt (Secure Store)</span>
+          <span class="pill">Owner-gebunden</span>
+          <span class="pill">Upload via Handy-Kamera</span>
+        </div>
+      </header>
+      <div class="properties" id="file-vault"></div>
     </section>
 
     <section class="panel" id="api">
