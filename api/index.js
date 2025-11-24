@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 const PORT = process.env.PORT || 4000;
 const app = express();
 
-const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseUrl = process.env.SUPABASE_URL ?? 'https://xbaokwesgokpffjonpwt.supabase.co';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 const SUPABASE_TABLE = 'houses';

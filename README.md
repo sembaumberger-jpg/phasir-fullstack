@@ -18,12 +18,16 @@ Postgres über Supabase.
 npm install
 ```
 
-2. Supabase-Umgebung setzen (Service-Role empfohlen, Anon-Key funktioniert ebenfalls für lokale Entwicklung):
+2. Supabase-Umgebung setzen (Service-Role empfohlen, Anon-Key funktioniert ebenfalls für lokale Entwicklung). Die API nutzt
+   standardmäßig das bereitgestellte Projekt `https://xbaokwesgokpffjonpwt.supabase.co`:
 
 ```bash
-export SUPABASE_URL="https://<your-project>.supabase.co"
-export SUPABASE_SERVICE_ROLE_KEY="<your-service-role-key>"
+export SUPABASE_URL="https://xbaokwesgokpffjonpwt.supabase.co"
+export SUPABASE_SERVICE_ROLE_KEY="<your-service-role-key>"  # Service-Role-Key des Supabase-Projekts
 ```
+
+Der `SUPABASE_SERVICE_ROLE_KEY` (oder alternativ `SUPABASE_ANON_KEY`) wird nur serverseitig gelesen. Für lokale Entwicklung
+kannst du ihn z. B. in einem `.env` ablegen oder direkt in der Shell exportieren, bevor du das Backend startest.
 
 Ohne gesetzte Variablen läuft das Backend weiter mit den eingebauten Demo-Daten im Speicher.
 
