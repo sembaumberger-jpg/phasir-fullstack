@@ -1,0 +1,13 @@
+{
+  "name": "Testhaus Sem",
+  "address": "Kölner Straße 10",
+  "buildYear": 2015,
+  "heatingType": "Gas",
+  "heatingInstallYear": 2017,
+  "lastHeatingService": "2024-01-01",
+  "roofInstallYear": 2015,
+  "lastRoofCheck": "2023-01-01",
+  "windowInstallYear": 2018,
+  "lastSmokeCheck": "2024-03-01"
+}
+

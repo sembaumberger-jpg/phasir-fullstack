@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import { v4 as uuid } from 'uuid';
@@ -6,9 +9,23 @@ import { createClient } from '@supabase/supabase-js';
 const PORT = process.env.PORT || 4000;
 const app = express();
 
-const supabaseUrl = process.env.SUPABASE_URL ?? 'https://xbaokwesgokpffjonpwt.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+// ---- Supabase Setup ----
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.warn(
+    '⚠️ Supabase URL oder Key fehlen. Backend läuft mit In-Memory Demo-Daten.'
+  );
+} else {
+  console.log(
+    '✅ Supabase-Konfiguration gefunden. Verwende Postgres-Datenbank.'
+  );
+}
+
+const supabase =
+  supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 const SUPABASE_TABLE = 'houses';
 
 app.use(cors());
@@ -21,6 +38,7 @@ const intervals = {
   smoke: 1,
 };
 
+// In-Memory Demo-Daten (Fallback, falls Supabase nicht konfiguriert ist)
 const houses = [
   {
     id: uuid(),
@@ -66,6 +84,23 @@ const houses = [
   },
 ];
 
+// 👉 Mapping: Supabase-Row (kleine Spaltennamen) -> internes House-Objekt (camelCase)
+const fromSupabaseRow = (row) => ({
+  id: row.id,
+  ownerName: row.ownername ?? 'Demo Nutzer',
+  name: row.name,
+  address: row.address,
+  buildYear: row.buildyear,
+  heatingType: row.heatingtype,
+  heatingInstallYear: row.heatinginstallyear,
+  lastHeatingService: row.lastheatingservice,
+  roofInstallYear: row.roofinstallyear,
+  lastRoofCheck: row.lastroofcheck,
+  windowInstallYear: row.windowinstallyear,
+  lastSmokeCheck: row.lastsmokecheck,
+});
+
+// 👉 Mapping: internes House-Objekt -> Supabase-Row (kleine Spaltennamen)
 const ensureHouseNumbers = (house) => ({
   ...house,
   buildYear: Number(house.buildYear),
@@ -74,6 +109,26 @@ const ensureHouseNumbers = (house) => ({
   windowInstallYear: Number(house.windowInstallYear),
 });
 
+const toSupabasePayload = (house) => {
+  const normalized = ensureHouseNumbers(house);
+  return {
+    id: normalized.id,
+    ownername: normalized.ownerName,
+    name: normalized.name,
+    address: normalized.address,
+    buildyear: normalized.buildYear,
+    heatingtype: normalized.heatingType,
+    heatinginstallyear: normalized.heatingInstallYear,
+    lastheatingservice: new Date(normalized.lastHeatingService).toISOString(),
+    roofinstallyear: normalized.roofInstallYear,
+    lastroofcheck: normalized.lastRoofCheck
+      ? new Date(normalized.lastRoofCheck).toISOString()
+      : null,
+    windowinstallyear: normalized.windowInstallYear,
+    lastsmokecheck: new Date(normalized.lastSmokeCheck).toISOString(),
+  };
+};
+
 const ensureHouseDates = (house) => ({
   ...house,
   lastHeatingService: new Date(house.lastHeatingService),
@@ -81,7 +136,8 @@ const ensureHouseDates = (house) => ({
   lastSmokeCheck: new Date(house.lastSmokeCheck),
 });
 
-const normalizeHouse = (house) => ensureHouseDates(ensureHouseNumbers(house));
+const normalizeHouse = (house) =>
+  ensureHouseDates(ensureHouseNumbers(house));
 
 const addYears = (date, years) => {
   const copy = new Date(date);
@@ -91,7 +147,10 @@ const addYears = (date, years) => {
 
 const computeNext = (house) => ({
   heating: addYears(house.lastHeatingService, intervals.heating),
-  roof: addYears(house.lastRoofCheck ?? `${house.roofInstallYear}-01-01`, intervals.roof),
+  roof: addYears(
+    house.lastRoofCheck ?? `${house.roofInstallYear}-01-01`,
+    intervals.roof
+  ),
   windows: addYears(`${house.windowInstallYear}-01-01`, intervals.windows),
   smoke: addYears(house.lastSmokeCheck, intervals.smoke),
 });
@@ -101,7 +160,9 @@ const serializeHouse = (house) => {
   return {
     ...normalized,
     lastHeatingService: normalized.lastHeatingService.toISOString(),
-    lastRoofCheck: normalized.lastRoofCheck ? normalized.lastRoofCheck.toISOString() : null,
+    lastRoofCheck: normalized.lastRoofCheck
+      ? normalized.lastRoofCheck.toISOString()
+      : null,
     lastSmokeCheck: normalized.lastSmokeCheck.toISOString(),
     next: computeNext(normalized),
   };
@@ -114,55 +175,47 @@ const parseHousePayload = (payload) => ({
   buildYear: Number(payload.buildYear),
   heatingType: payload.heatingType,
   heatingInstallYear: Number(payload.heatingInstallYear),
-  lastHeatingService: new Date(payload.lastHeatingService),
+  lastHeatingService: payload.lastHeatingService,
   roofInstallYear: Number(payload.roofInstallYear),
-  lastRoofCheck: payload.lastRoofCheck ? new Date(payload.lastRoofCheck) : new Date(`${payload.roofInstallYear}-01-01`),
+  lastRoofCheck: payload.lastRoofCheck || `${payload.roofInstallYear}-01-01`,
   windowInstallYear: Number(payload.windowInstallYear),
-  lastSmokeCheck: new Date(payload.lastSmokeCheck),
+  lastSmokeCheck: payload.lastSmokeCheck,
 });
 
-const toSupabasePayload = (house) => {
-  const normalized = normalizeHouse(house);
-  return {
-    id: house.id,
-    ownerName: normalized.ownerName,
-    name: normalized.name,
-    address: normalized.address,
-    buildYear: normalized.buildYear,
-    heatingType: normalized.heatingType,
-    heatingInstallYear: normalized.heatingInstallYear,
-    lastHeatingService: normalized.lastHeatingService.toISOString(),
-    roofInstallYear: normalized.roofInstallYear,
-    lastRoofCheck: normalized.lastRoofCheck ? normalized.lastRoofCheck.toISOString() : null,
-    windowInstallYear: normalized.windowInstallYear,
-    lastSmokeCheck: normalized.lastSmokeCheck.toISOString(),
-  };
-};
+// ---------- DB Funktionen ----------
 
 const fetchAllHouses = async () => {
   if (!supabase) return houses;
 
   const { data, error } = await supabase.from(SUPABASE_TABLE).select('*');
   if (error) {
+    console.error('🔴 Supabase fetchAllHouses failed:', error);
     throw new Error(`Supabase fetchAllHouses failed: ${error.message}`);
   }
 
-  return data.map(normalizeHouse);
+  return data.map(fromSupabaseRow).map(normalizeHouse);
 };
 
 const fetchHouseById = async (id) => {
   if (!supabase) return houses.find((h) => h.id === id) ?? null;
 
-  const { data, error } = await supabase.from(SUPABASE_TABLE).select('*').eq('id', id).single();
+  const { data, error } = await supabase
+    .from(SUPABASE_TABLE)
+    .select('*')
+    .eq('id', id)
+    .single();
+
   if (error && error.code !== 'PGRST116') {
+    console.error('🔴 Supabase fetchHouseById failed:', error);
     throw new Error(`Supabase fetchHouseById failed: ${error.message}`);
   }
 
-  return data ? normalizeHouse(data) : null;
+  return data ? normalizeHouse(fromSupabaseRow(data)) : null;
 };
 
 const createHouse = async (payload) => {
   const house = { id: uuid(), ...parseHousePayload(payload) };
+
   if (!supabase) {
     houses.push(house);
     return house;
@@ -175,10 +228,11 @@ const createHouse = async (payload) => {
     .single();
 
   if (error) {
+    console.error('🔴 Supabase createHouse failed:', error);
     throw new Error(`Supabase createHouse failed: ${error.message}`);
   }
 
-  return normalizeHouse(data);
+  return normalizeHouse(fromSupabaseRow(data));
 };
 
 const updateHouseById = async (id, payload) => {
@@ -193,7 +247,12 @@ const updateHouseById = async (id, payload) => {
   const existing = await fetchHouseById(id);
   if (!existing) return null;
 
-  const merged = { id, ...existing, ...parseHousePayload({ ...existing, ...payload }) };
+  const merged = {
+    id,
+    ...existing,
+    ...parseHousePayload({ ...existing, ...payload }),
+  };
+
   const { data, error } = await supabase
     .from(SUPABASE_TABLE)
     .update(toSupabasePayload(merged))
@@ -202,11 +261,14 @@ const updateHouseById = async (id, payload) => {
     .single();
 
   if (error) {
+    console.error('🔴 Supabase updateHouseById failed:', error);
     throw new Error(`Supabase updateHouseById failed: ${error.message}`);
   }
 
-  return normalizeHouse(data);
+  return normalizeHouse(fromSupabaseRow(data));
 };
+
+// ---------- Routes ----------
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', supabase: Boolean(supabase) });
@@ -247,14 +309,16 @@ app.post('/houses', async (req, res) => {
   ];
   const missing = required.filter((key) => !req.body?.[key]);
   if (missing.length) {
-    return res.status(400).json({ error: `Missing fields: ${missing.join(', ')}` });
+    return res.status(400).json({
+      error: `Missing fields: ${missing.join(', ')}`,
+    });
   }
 
   try {
     const house = await createHouse(req.body);
     res.status(201).json(serializeHouse(house));
   } catch (error) {
-    console.error(error);
+    console.error('🔴 createHouse route error:', error);
     res.status(500).json({ error: 'Failed to create house' });
   }
 });
@@ -265,7 +329,7 @@ app.put('/houses/:id', async (req, res) => {
     if (!house) return res.status(404).json({ error: 'House not found' });
     res.json(serializeHouse(house));
   } catch (error) {
-    console.error(error);
+    console.error('🔴 updateHouse route error:', error);
     res.status(500).json({ error: 'Failed to update house' });
   }
 });
