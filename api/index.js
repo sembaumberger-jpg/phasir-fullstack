@@ -41,6 +41,7 @@ const intervals = {
 };
 
 // 🆕 ---- News API Setup (für Immobilien-News) ----
+
 const NEWS_API_BASE_URL = process.env.NEWS_API_BASE_URL || '';
 const NEWS_API_KEY = process.env.NEWS_API_KEY || '';
 
@@ -61,6 +62,7 @@ if (!NEWS_API_BASE_URL || !NEWS_API_KEY) {
 
 // ---- OpenAI Setup ----
 const openaiApiKey = process.env.OPENAI_API_KEY || '';
+
 const openai = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
 
 if (!openai) {
@@ -583,6 +585,7 @@ async function generateProblemAnalysisWithAI(house, description) {
         'Basierend auf einer einfachen Heuristik geschätzte Ursache.',
       recommendedAction:
         'Lass die genaue Ursache von einem passenden Fachbetrieb prüfen. Nutze die vorgeschlagenen Dienstleister in deiner Umgebung.',
+      firstAidSteps: FIRST_AID_STEPS[category] || FIRST_AID_STEPS.general,
     };
   }
 
@@ -637,9 +640,11 @@ Regeln:
     return {
       category: 'general',
       urgency: 3,
-      likelyCause: 'Die KI konnte keine eindeutige Analyse durchführen.',
+      likelyCause:
+        'Die KI konnte keine eindeutige Analyse durchführen.',
       recommendedAction:
         'Lass die genaue Ursache von einem passenden Fachbetrieb prüfen. Nutze die vorgeschlagenen Dienstleister in deiner Umgebung.',
+      firstAidSteps: FIRST_AID_STEPS.general,
     };
   }
 
@@ -651,6 +656,8 @@ Regeln:
     recommendedAction:
       parsed.recommendedAction ||
       'Lass die genaue Ursache von einem passenden Fachbetrieb prüfen.',
+    firstAidSteps:
+      FIRST_AID_STEPS[parsed.category] || FIRST_AID_STEPS.general,
   };
 }
 
@@ -1005,7 +1012,8 @@ app.get(
   '/houses/:id',
   asyncRoute(async (req, res) => {
     const house = await fetchHouseById(req.params.id);
-    if (!house) return res.status(404).json({ error: 'House not found' });
+    if (!house)
+      return res.status(404).json({ error: 'House not found' });
     res.json(serializeHouse(house));
   })
 );
@@ -1040,7 +1048,8 @@ app.put(
   '/houses/:id',
   asyncRoute(async (req, res) => {
     const house = await updateHouseById(req.params.id, req.body);
-    if (!house) return res.status(404).json({ error: 'House not found' });
+    if (!house)
+      return res.status(404).json({ error: 'House not found' });
     res.json(serializeHouse(house));
   })
 );
@@ -1052,7 +1061,9 @@ app.post(
   asyncRoute(async (req, res) => {
     const { houseId } = req.body || {};
     if (!houseId) {
-      return res.status(400).json({ error: 'houseId is required' });
+      return res
+        .status(400)
+        .json({ error: 'houseId is required' });
     }
 
     const house = await fetchHouseById(houseId);
@@ -1087,7 +1098,10 @@ app.post(
     }
 
     const userHouses = await fetchAllHouses(ownerId);
-    console.log('📊 /ai/rent-benchmark houses found =', userHouses.length);
+    console.log(
+      '📊 /ai/rent-benchmark houses found =',
+      userHouses.length
+    );
 
     const result = computeRentBenchmark(userHouses);
     res.json(result);
@@ -1111,7 +1125,10 @@ app.post(
       return res.status(404).json({ error: 'House not found' });
     }
 
-    const analysis = await generateProblemAnalysisWithAI(house, description);
+    const analysis = await generateProblemAnalysisWithAI(
+      house,
+      description
+    );
 
     // ein wenig angereicherte Antwort für die App
     res.json({
@@ -1119,6 +1136,7 @@ app.post(
       urgency: analysis.urgency,
       likelyCause: analysis.likelyCause,
       recommendedAction: analysis.recommendedAction,
+      firstAidSteps: analysis.firstAidSteps || [],
       houseName: house.name,
       houseAddress: house.address,
     });
@@ -1136,6 +1154,59 @@ const CATEGORY_TO_QUERY = {
   humidity: 'Schimmel Sanierung',
   energy: 'Energieberatung',
   general: 'Hausmeister Service',
+};
+
+// 🆘 Erste-Hilfe-Anleitungen je Kategorie
+// Diese Anweisungen werden dem Nutzer als Sofortmaßnahmen angezeigt, bevor ein Fachbetrieb kontaktiert wird.
+const FIRST_AID_STEPS = {
+  heating: [
+    'Heizung ausschalten und abkühlen lassen.',
+    'Sichtprüfung auf offensichtliche Lecks oder Beschädigungen durchführen.',
+    'Falls Wasser austritt: Hauptwasserzufuhr abschalten.',
+    'Fachbetrieb kontaktieren, bevor Sie die Anlage wieder einschalten.',
+  ],
+  water: [
+    'Hauptwasserhahn sofort schließen, um weitere Schäden zu vermeiden.',
+    'Elektrische Geräte in der Nähe ausschalten.',
+    'Eimer oder Handtücher bereitstellen, um auslaufendes Wasser aufzufangen.',
+    'Schäden dokumentieren (Fotos) für die Versicherung.',
+  ],
+  plumbing: [
+    'Wasserzufuhr an der betroffenen Leitung abstellen.',
+    'Stark tropfende Stellen provisorisch abdichten (z. B. mit einem Lappen).',
+    'Keine Chemikalien in den Abfluss gießen.',
+    'Fachbetrieb kontaktieren, um den Schaden professionell zu beheben.',
+  ],
+  roof: [
+    'Sichern Sie lose Dachziegel, sofern gefahrlos möglich.',
+    'Betreten Sie das Dach nur, wenn absolut nötig und sicher.',
+    'Beobachten Sie eindringendes Wasser im Inneren und stellen Sie Eimer bereit.',
+    'Bei Sturm oder Starkregen: Bereiche unter dem Dach frei räumen.',
+  ],
+  electric: [
+    'Strom am Sicherungskasten für den betroffenen Bereich abschalten.',
+    'Keine Steckdosen oder Kabel anfassen.',
+    'Bei Brandgeruch: Feuermelder alarmieren und gegebenenfalls Feuerwehr rufen.',
+    'Fachbetrieb oder Elektriker kontaktieren.',
+  ],
+  humidity: [
+    'Räume lüften, um Feuchtigkeit zu reduzieren.',
+    'Betroffene Bereiche trocken wischen und ggf. Heizung einschalten.',
+    'Schimmelbefall nicht direkt berühren – Schutzmaske tragen.',
+    'Fachbetrieb für Schimmelbeseitigung kontaktieren.',
+  ],
+  energy: [
+    'Nicht benötigte Geräte ausschalten, um Energieverbrauch zu senken.',
+    'Temperatur in Räumen moderat einstellen.',
+    'Fenster und Türen schließen, um Wärme zu halten.',
+    'Energieberater konsultieren für weitere Maßnahmen.',
+  ],
+  general: [
+    'Ruhe bewahren und Gefahrenquelle absichern.',
+    'Fotos des Problems zur Dokumentation machen.',
+    'Betroffene Personen aus dem Gefahrenbereich entfernen.',
+    'Fachbetrieb kontaktieren und Versicherung informieren.',
+  ],
 };
 
 app.get(
@@ -1206,19 +1277,170 @@ app.get(
     const data = await response.json();
     const results = data.results || [];
 
-    const vendors = results.slice(0, 10).map((place) => ({
-      id: place.place_id || place.id || place.reference,
-      name: place.name,
-      lat: place.geometry?.location?.lat ?? null,
-      lng: place.geometry?.location?.lng ?? null,
-      rating: place.rating ?? null,
-      phone: null, // könnte über Place Details ergänzt werden
-      website: place.website ?? null,
-      address: place.formatted_address ?? null,
-      distanceKm: null, // könnte berechnet werden, wenn du die Haus-Koordinate kennst
-    }));
+    // Für jede gefundene Location (max. 10) optional Details abrufen (Telefon, Website)
+    const vendors = await Promise.all(
+      results.slice(0, 10).map(async (place) => {
+        let phone = null;
+        let website = place.website ?? null;
+        if (place.place_id && GOOGLE_PLACES_API_KEY) {
+          try {
+            const detailsUrl = new URL(
+              'https://maps.googleapis.com/maps/api/place/details/json'
+            );
+            detailsUrl.search = new URLSearchParams({
+              place_id: place.place_id,
+              key: GOOGLE_PLACES_API_KEY,
+              fields: 'formatted_phone_number,website',
+            }).toString();
+            const detailsRes = await fetch(detailsUrl);
+            if (detailsRes.ok) {
+              const detailsData = await detailsRes.json();
+              const details = detailsData.result || {};
+              phone = details.formatted_phone_number || null;
+              website = details.website || website;
+            }
+          } catch (err) {
+            console.error(
+              '🔴 Fehler beim Abruf von Place-Details:',
+              place.place_id,
+              err
+            );
+          }
+        }
+        return {
+          id: place.place_id || place.id || place.reference,
+          name: place.name,
+          lat: place.geometry?.location?.lat ?? null,
+          lng: place.geometry?.location?.lng ?? null,
+          rating: place.rating ?? null,
+          phone,
+          website,
+          address: place.formatted_address ?? null,
+          distanceKm: null,
+        };
+      })
+    );
+
+    // Nach Bewertung sortieren (höchste zuerst)
+    vendors.sort((a, b) => {
+      const ra = a.rating || 0;
+      const rb = b.rating || 0;
+      return rb - ra;
+    });
 
     res.json({ vendors });
+  })
+);
+
+// ---------- Heuristische Problemradar-Funktion ----------
+// Analysiert Alter und Wartungszustände verschiedener Systeme eines Hauses
+// und gibt eine Liste möglicher Probleme zurück, sortiert nach Priorität.
+function computeProblemRadarForHouse(house) {
+  const issues = [];
+  const now = new Date();
+  const currentYear = now.getFullYear();
+
+  // Heizungsanlage – typischer Austausch nach 15–20 Jahren
+  const heatingAge = currentYear - (house.heatingInstallYear || house.buildYear);
+  if (heatingAge >= 15) {
+    issues.push({
+      system: 'heating',
+      summary: 'Die Heizungsanlage ist älter als 15 Jahre.',
+      recommendation: 'Wartung oder Austausch in Betracht ziehen.',
+      severity: heatingAge >= 20 ? 'high' : 'medium',
+      projectedYear: currentYear + 1,
+    });
+  }
+
+  // Dach – Wartung alle 5 Jahre, Austausch nach ca. 20–30 Jahren
+  const roofAge = currentYear - (house.roofInstallYear || house.buildYear);
+  if (roofAge >= 20) {
+    issues.push({
+      system: 'roof',
+      summary: 'Das Dach ist älter als 20 Jahre.',
+      recommendation: 'Dachinspektion und mögliche Sanierung planen.',
+      severity: roofAge >= 30 ? 'high' : 'medium',
+      projectedYear: currentYear + 1,
+    });
+  }
+
+  // Fenster – Austausch nach 20 Jahren
+  const windowAge = currentYear - (house.windowInstallYear || house.buildYear);
+  if (windowAge >= 20) {
+    issues.push({
+      system: 'windows',
+      summary: 'Die Fenster sind älter als 20 Jahre.',
+      recommendation: 'Fenster prüfen und ggf. austauschen lassen.',
+      severity: windowAge >= 25 ? 'medium' : 'low',
+      projectedYear: currentYear + 2,
+    });
+  }
+
+  // Rauchmelder – jährliche Wartung
+  if (house.lastSmokeCheck) {
+    const lastSmokeCheckDate = new Date(house.lastSmokeCheck);
+    const nextSmokeDue = new Date(lastSmokeCheckDate);
+    nextSmokeDue.setFullYear(nextSmokeDue.getFullYear() + 1);
+    if (nextSmokeDue < now) {
+      issues.push({
+        system: 'smoke',
+        summary: 'Rauchmelder warten',
+        recommendation: 'Wartung oder Batteriewechsel durchführen.',
+        severity: 'medium',
+        projectedYear: now.getFullYear(),
+      });
+    }
+  }
+
+  // Wartungsintervalle aus "next"-Feld berücksichtigen
+  if (house.next) {
+    ['heating', 'roof', 'windows', 'smoke'].forEach((key) => {
+      const nextDate = house.next[key];
+      if (nextDate) {
+        const due = new Date(nextDate);
+        if (due < now) {
+          issues.push({
+            system: key,
+            summary: `Überfällige Wartung: ${key}`,
+            recommendation: 'Wartung zeitnah durchführen.',
+            severity: 'high',
+            projectedYear: due.getFullYear(),
+          });
+        }
+      }
+    });
+  }
+
+  return issues;
+}
+
+// 🧭 ---------- PROBLEM-RADAR ENDPOINT ----------
+// Liefert prognostizierte Probleme für alle Häuser des Nutzers oder für ein einzelnes Haus
+app.get(
+  '/ai/problem-radar',
+  asyncRoute(async (req, res) => {
+    const { ownerId, houseId } = req.query || {};
+    // Einzelnes Haus anfragen
+    if (houseId) {
+      const house = await fetchHouseById(houseId);
+      if (!house) {
+        return res.status(404).json({ error: 'House not found' });
+      }
+      const issues = computeProblemRadarForHouse(house);
+      return res.json({
+        houseId: house.id,
+        houseName: house.name,
+        issues,
+      });
+    }
+    // Alle Häuser eines Nutzers abrufen; ownerId kann optional sein
+    const housesList = await fetchAllHouses(ownerId || null);
+    const result = housesList.map((h) => ({
+      houseId: h.id,
+      houseName: h.name,
+      issues: computeProblemRadarForHouse(h),
+    }));
+    res.json({ houses: result });
   })
 );
 
@@ -1231,9 +1453,9 @@ app.post(
     const { email, password } = req.body || {};
 
     if (!email || !password) {
-      res
-        .status(400)
-        .json({ error: 'E-Mail und Passwort sind erforderlich.' });
+      res.status(400).json({
+        error: 'E-Mail und Passwort sind erforderlich.',
+      });
       return;
     }
 
@@ -1242,14 +1464,16 @@ app.post(
     // existiert schon?
     const existing = users.find((u) => u.email === normalizedEmail);
     if (existing) {
-      res.status(409).json({ error: 'Für diese E-Mail existiert bereits ein Konto.' });
+      res.status(409).json({
+        error: 'Für diese E-Mail existiert bereits ein Konto.',
+      });
       return;
     }
 
     if (password.length < 8) {
-      res
-        .status(400)
-        .json({ error: 'Passwort muss mindestens 8 Zeichen haben.' });
+      res.status(400).json({
+        error: 'Passwort muss mindestens 8 Zeichen haben.',
+      });
       return;
     }
 
@@ -1281,7 +1505,9 @@ app.post(
     const { email, password } = req.body || {};
 
     if (!email || !password) {
-      res.status(400).json({ error: 'E-Mail und Passwort sind erforderlich.' });
+      res.status(400).json({
+        error: 'E-Mail und Passwort sind erforderlich.',
+      });
       return;
     }
 
@@ -1290,21 +1516,22 @@ app.post(
 
     if (!user) {
       // kein User mit dieser Mail
-      res
-        .status(401)
-        .json({
-          error: 'Diese Kombination aus E-Mail und Passwort ist nicht gültig.',
-        });
+      res.status(401).json({
+        error:
+          'Diese Kombination aus E-Mail und Passwort ist nicht gültig.',
+      });
       return;
     }
 
-    const isValid = await bcrypt.compare(password, user.passwordHash);
+    const isValid = await bcrypt.compare(
+      password,
+      user.passwordHash
+    );
     if (!isValid) {
-      res
-        .status(401)
-        .json({
-          error: 'Diese Kombination aus E-Mail und Passwort ist nicht gültig.',
-        });
+      res.status(401).json({
+        error:
+          'Diese Kombination aus E-Mail und Passwort ist nicht gültig.',
+      });
       return;
     }
 
@@ -1319,6 +1546,7 @@ app.post(
 );
 
 // 🆕 ---------- REAL ESTATE NEWS ENDPOINT (mit fetch) ----------
+
 app.get(
   '/news/real-estate',
   asyncRoute(async (req, res) => {
@@ -1373,9 +1601,9 @@ app.get(
         '🔴 News API responded with status:',
         response.status
       );
-      return res
-        .status(502)
-        .json({ error: 'Failed to fetch news from upstream API' });
+      return res.status(502).json({
+        error: 'Failed to fetch news from upstream API',
+      });
     }
 
     const data = await response.json();

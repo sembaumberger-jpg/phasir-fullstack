@@ -2,9 +2,9 @@ import SwiftUI
 import MapKit
 
 /// Ein Screen für den neuen USP: Probleme beschreiben, KI analysiert, passende Dienstleister zeigen.
-public struct ProblemSolverView: View {
+struct ProblemSolverView: View {
     /// Das aktuelle Haus, zu dem das Problem beschrieben wird.
-    public let house: House
+    let house: House
 
     @State private var descriptionText: String = ""
     @State private var diagnosis: ProblemDiagnosis?
@@ -16,11 +16,11 @@ public struct ProblemSolverView: View {
 
     @Environment(\.openURL) private var openURL
 
-    public init(house: House) {
+    init(house: House) {
         self.house = house
     }
 
-    public var body: some View {
+    var body: some View {
         ZStack {
             Color.phasirBackground.ignoresSafeArea()
             ScrollView {
@@ -115,6 +115,18 @@ public struct ProblemSolverView: View {
             }
             .buttonStyle(.plain)
             .disabled(isLoadingDiagnosis || descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            // Link zu einem ausführlichen Interview mit zusätzlichen Folgefragen
+            NavigationLink {
+                ProblemInterviewView(house: house, initialDescription: descriptionText)
+            } label: {
+                Text("Detailliertes Interview starten")
+                    .font(.phasirCaption)
+                    .foregroundColor(Color.phasirAccent)
+                    .underline()
+            }
+            .disabled(descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
             Text("Dein Objekt: \(house.name) – \(house.address)")
                 .font(.phasirCaption)
                 .foregroundColor(Color.phasirSecondaryText)
@@ -206,6 +218,27 @@ public struct ProblemSolverView: View {
                     .foregroundColor(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // Sofortmaßnahmen aus der Diagnose anzeigen
+            if let steps = diagnosis.firstAidSteps, !steps.isEmpty {
+                Divider().padding(.vertical, 4)
+                Text("Sofortmaßnahmen")
+                    .font(.phasirCaption)
+                    .foregroundColor(Color.phasirSecondaryText)
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(steps, id: \.self) { step in
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                                .padding(.top, 4)
+                            Text(step)
+                                .font(.phasirCaption)
+                                .foregroundColor(Color.phasirSecondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
             if !vendors.isEmpty {
                 Divider().padding(.vertical, 4)
                 HStack(spacing: 6) {
@@ -232,19 +265,20 @@ public struct ProblemSolverView: View {
                 }
             }
             if let region = mapRegion {
+                // Filter out vendors without valid coordinates to avoid returning Void from the annotation closure
+                let coordinateVendors = vendors.filter { $0.coordinate != nil }
                 Map(
                     coordinateRegion: Binding(
                         get: { region },
                         set: { newValue in mapRegion = newValue }
                     ),
-                    annotationItems: vendors
+                    annotationItems: coordinateVendors
                 ) { vendor in
-                    if let coord = vendor.coordinate {
-                        MapAnnotation(coordinate: coord) {
-                            Image(systemName: "mappin.circle.fill")
-                                .font(.title2)
-                                .foregroundColor(.red)
-                        }
+                    // Safe unwrap because we filtered nil coordinates above
+                    MapAnnotation(coordinate: vendor.coordinate!) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.red)
                     }
                 }
                 .frame(height: 220)

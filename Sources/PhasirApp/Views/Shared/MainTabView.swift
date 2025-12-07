@@ -3,9 +3,11 @@ import SwiftUI
 struct MainTabView: View {
     @ObservedObject var sessionManager: SessionManager
     @StateObject private var houseListViewModel: HouseListViewModel
+    private let houseService: HouseService
 
     init(sessionManager: SessionManager, houseService: HouseService) {
         self.sessionManager = sessionManager
+        self.houseService = houseService
         _houseListViewModel = StateObject(
             wrappedValue: HouseListViewModel(service: houseService)
         )
@@ -35,6 +37,16 @@ struct MainTabView: View {
             }
             .tabItem {
                 Label("Insights", systemImage: "chart.bar.xaxis")
+            }
+
+            // 🧭 RADAR: Problem-Radar / Prognosen
+            NavigationStack {
+                ProblemRadarView(
+                    viewModel: ProblemRadarViewModel(houseService: houseService)
+                )
+            }
+            .tabItem {
+                Label("Radar", systemImage: "exclamationmark.triangle.fill")
             }
 
             // PROFIL

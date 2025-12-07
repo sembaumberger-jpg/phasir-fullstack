@@ -18,6 +18,9 @@ final class HouseService: ObservableObject {
 
     // 📊 Mietspiegel / Markt-Benchmark
     @Published private(set) var rentBenchmarkAdvice: RentBenchmarkAdvice?
+    
+    // 🧭 Problem-Radar (prognostizierte Probleme je Haus)
+    @Published private(set) var problemRadar: [HouseProblemRadar] = []
 
     let baseURL: URL
     private let decoder: JSONDecoder
@@ -413,6 +416,57 @@ final class HouseService: ObservableObject {
                 print("🔍 Detail:", decodingError)
             }
             errorMessage = "Konnte Reparatur-Einschätzung nicht laden: \(error.localizedDescription)"
+        }
+    }
+    
+    // MARK: - Problem-Radar laden
+
+    func fetchProblemRadar() async {
+        guard let ownerId = currentUserId else {
+            print("❌ Kein currentUserId gesetzt – kann Problem-Radar nicht laden.")
+            return
+        }
+        
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            var components = URLComponents(
+                url: baseURL.appendingPathComponent("ai/problem-radar"),
+                resolvingAgainstBaseURL: false
+            )!
+            components.queryItems = [URLQueryItem(name: "ownerId", value: ownerId)]
+            guard let url = components.url else {
+                throw URLError(.badURL)
+            }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            applyAuthHeaders(to: &request)
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            if let http = response as? HTTPURLResponse {
+                print("🌐 GET /ai/problem-radar status code:", http.statusCode)
+            }
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("📦 Response von /ai/problem-radar:")
+                print(jsonString)
+            }
+            
+            guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
+                throw URLError(.badServerResponse)
+            }
+            
+            let radarResponse = try decoder.decode(ProblemRadarResponse.self, from: data)
+            problemRadar = radarResponse.houses ?? []
+            errorMessage = nil
+        } catch {
+            print("❌ Fehler in fetchProblemRadar:", error)
+            if let decodingError = error as? DecodingError {
+                print("🔍 Detail:", decodingError)
+            }
+            errorMessage = "Konnte Problem-Radar nicht laden: \(error.localizedDescription)"
         }
     }
 

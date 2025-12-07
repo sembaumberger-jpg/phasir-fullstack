@@ -3,35 +3,62 @@ import CoreLocation
 
 /// KI-Diagnose des Problems.
 /// Enthält die wesentlichen Informationen für die Problem-Einschätzung.
-public struct ProblemDiagnosis: Codable {
-    public let category: String
-    public let urgency: Int
-    public let likelyCause: String
-    public let recommendedAction: String
-    public let houseName: String?
-    public let houseAddress: String?
+struct ProblemDiagnosis: Codable {
+    let category: String
+    let urgency: Int
+    let likelyCause: String
+    let recommendedAction: String
+    let houseName: String?
+    let houseAddress: String?
+    /// Sofortmaßnahmen, die der Eigentümer direkt ausführen kann
+    let firstAidSteps: [String]?
 }
 
 /// Dienstleister / Vendor in der Nähe.
-public struct Vendor: Codable, Identifiable {
-    public let id: String
-    public let name: String
-    public let lat: Double?
-    public let lng: Double?
-    public let rating: Double?
-    public let phone: String?
-    public let website: String?
-    public let address: String?
-    public let distanceKm: Double?
+struct Vendor: Codable, Identifiable {
+    let id: String
+    let name: String
+    let lat: Double?
+    let lng: Double?
+    let rating: Double?
+    let phone: String?
+    let website: String?
+    let address: String?
+    let distanceKm: Double?
 
     /// Optional: Hilfs-Property zur Nutzung in MapKit.
-    public var coordinate: CLLocationCoordinate2D? {
+    var coordinate: CLLocationCoordinate2D? {
         guard let lat = lat, let lng = lng else { return nil }
         return CLLocationCoordinate2D(latitude: lat, longitude: lng)
     }
 }
 
+/// Vorhersage möglicher zukünftiger Probleme für ein Haus
+struct ProblemPrediction: Codable, Identifiable {
+    let id = UUID()
+    let system: String
+    let summary: String
+    let recommendation: String
+    let severity: String
+    let projectedYear: Int
+}
+
+/// Sammlung aller prognostizierten Probleme eines Hauses
+struct HouseProblemRadar: Codable, Identifiable {
+    let id: String
+    let name: String
+    let issues: [ProblemPrediction]
+}
+
+/// Antwort des Problemradar-Endpunkts
+struct ProblemRadarResponse: Codable {
+    let houses: [HouseProblemRadar]?
+    let houseId: String?
+    let houseName: String?
+    let issues: [ProblemPrediction]?
+}
+
 /// Wrapper für die Vendor-Response des Backends.
-public struct VendorResponse: Codable {
-    public let vendors: [Vendor]
+struct VendorResponse: Codable {
+    let vendors: [Vendor]
 }

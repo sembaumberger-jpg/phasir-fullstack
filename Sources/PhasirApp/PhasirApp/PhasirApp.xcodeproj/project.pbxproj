@@ -25,6 +25,9 @@
 		2C45980C2EDB110D0098C932 /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C4597FC2EDB110D0098C932 /* AuthModels.swift */; };
 		2C56713B2EE6181B007CECB0 /* ProblemSolverModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C56713A2EE6181B007CECB0 /* ProblemSolverModels.swift */; };
 		2C56713D2EE61889007CECB0 /* ProblemSolverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C56713C2EE61889007CECB0 /* ProblemSolverView.swift */; };
+		2C56713F2EE62CBB007CECB0 /* ProblemRadarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C56713E2EE62CBB007CECB0 /* ProblemRadarView.swift */; };
+		2C5671412EE62E46007CECB0 /* ProblemRadarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C5671402EE62E46007CECB0 /* ProblemRadarViewModel.swift */; };
+		2C5671432EE62EF8007CECB0 /* ProblemInterviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C5671422EE62EF8007CECB0 /* ProblemInterviewView.swift */; };
 		2C66B7F62EDF87CF00B375CE /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C66B7F52EDF87CF00B375CE /* ProfileView.swift */; };
 		2C66B7F82EDFA8A100B375CE /* Assests.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2C66B7F72EDFA8A100B375CE /* Assests.xcassets */; };
 		2CCE8E132EDDCEE900E4A18F /* InsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CCE8E122EDDCEE900E4A18F /* InsightsView.swift */; };
@@ -59,6 +62,9 @@
 		2C4597FC2EDB110D0098C932 /* AuthModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthModels.swift; sourceTree = "<group>"; };
 		2C56713A2EE6181B007CECB0 /* ProblemSolverModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProblemSolverModels.swift; sourceTree = "<group>"; };
 		2C56713C2EE61889007CECB0 /* ProblemSolverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProblemSolverView.swift; sourceTree = "<group>"; };
+		2C56713E2EE62CBB007CECB0 /* ProblemRadarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProblemRadarView.swift; sourceTree = "<group>"; };
+		2C5671402EE62E46007CECB0 /* ProblemRadarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProblemRadarViewModel.swift; sourceTree = "<group>"; };
+		2C5671422EE62EF8007CECB0 /* ProblemInterviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProblemInterviewView.swift; sourceTree = "<group>"; };
 		2C66B7F52EDF87CF00B375CE /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		2C66B7F72EDFA8A100B375CE /* Assests.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assests.xcassets; sourceTree = "<group>"; };
 		2CCE8E122EDDCEE900E4A18F /* InsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsView.swift; sourceTree = "<group>"; };
@@ -115,6 +121,8 @@
 				2CCE8E162EDDF8A600E4A18F /* ContentView.swift */,
 				2C66B7F52EDF87CF00B375CE /* ProfileView.swift */,
 				2C56713C2EE61889007CECB0 /* ProblemSolverView.swift */,
+				2C56713E2EE62CBB007CECB0 /* ProblemRadarView.swift */,
+				2C5671422EE62EF8007CECB0 /* ProblemInterviewView.swift */,
 			);
 			name = Views;
 			path = ../Views;
@@ -184,6 +192,7 @@
 				2CCE8E182EDE130600E4A18F /* RepairAdvice.swift */,
 				2CCE8E1A2EDE44A500E4A18F /* RentBenchmarkAdvice.swift */,
 				2C56713A2EE6181B007CECB0 /* ProblemSolverModels.swift */,
+				2C5671402EE62E46007CECB0 /* ProblemRadarViewModel.swift */,
 			);
 			name = Models;
 			path = ../Models;
@@ -259,9 +268,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				2C4597FD2EDB110D0098C932 /* LoginView.swift in Sources */,
+				2C56713F2EE62CBB007CECB0 /* ProblemRadarView.swift in Sources */,
 				2C56713D2EE61889007CECB0 /* ProblemSolverView.swift in Sources */,
 				2C45980C2EDB110D0098C932 /* AuthModels.swift in Sources */,
 				2CD5C7582EDD01BC0082C757 /* EnergyAdvice.swift in Sources */,
+				2C5671412EE62E46007CECB0 /* ProblemRadarViewModel.swift in Sources */,
 				2C45980B2EDB110D0098C932 /* House.swift in Sources */,
 				2C12C3AA2EE1E9530084D8B6 /* NewsModels.swift in Sources */,
 				2C4598072EDB110D0098C932 /* Models.swift in Sources */,
@@ -286,6 +297,7 @@
 				2C56713B2EE6181B007CECB0 /* ProblemSolverModels.swift in Sources */,
 				2CCE8E152EDDEE3600E4A18F /* FinanceAdvice.swift in Sources */,
 				2C45980A2EDB110D0098C932 /* HouseListViewModel.swift in Sources */,
+				2C5671432EE62EF8007CECB0 /* ProblemInterviewView.swift in Sources */,
 				2CF49CFD2EE3B5EB000254D9 /* LaunchScreenView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
