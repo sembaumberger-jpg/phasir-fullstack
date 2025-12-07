@@ -435,12 +435,19 @@ struct HouseFormView: View {
     // MARK: - Submit
 
     private func submit() {
-        isSubmitting = true
-        Task {
+        // alles auf dem MainActor halten, um UI-Crashes zu vermeiden
+        Task { @MainActor in
+            guard !isSubmitting else { return }
+            isSubmitting = true
+
             applyNumericFieldsToRequest()
-            _ = await onSubmit(request)
+            let success = await onSubmit(request)
+
             isSubmitting = false
-            dismiss()
+
+            if success {
+                dismiss()
+            }
         }
     }
 
@@ -483,7 +490,6 @@ private func cleanString(from value: Double) -> String {
         return String(format: "%.2f", value)
     }
 }
-
 
 // Binding<Date?> → Date
 private extension Binding where Value == Date {

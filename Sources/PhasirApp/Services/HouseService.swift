@@ -19,8 +19,6 @@ final class HouseService: ObservableObject {
     // 📊 Mietspiegel / Markt-Benchmark
     @Published private(set) var rentBenchmarkAdvice: RentBenchmarkAdvice?
 
-
-
     let baseURL: URL
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
@@ -208,11 +206,22 @@ final class HouseService: ObservableObject {
             }
 
             let updated = try decoder.decode(House.self, from: data)
+            print("✅ Decoded updated house with id:", updated.id)
 
-            if let index = houses.firstIndex(where: { $0.id == houseId }) {
+            // Erst versuchen, über die ID aus dem Backend zu matchen
+            if let index = houses.firstIndex(where: { $0.id == updated.id }) {
                 houses[index] = updated
-            } else {
+                print("🔁 Haus in Liste per updated.id ersetzt")
+            }
+            // Fallback: über die houseId aus dem Funktionsparameter
+            else if let indexByParam = houses.firstIndex(where: { $0.id == houseId }) {
+                houses[indexByParam] = updated
+                print("🔁 Haus in Liste per houseId-Parameter ersetzt")
+            }
+            // Falls aus irgendeinem Grund nicht gefunden → anhängen
+            else {
                 houses.append(updated)
+                print("➕ Updated-Haus nicht gefunden, neu hinzugefügt")
             }
 
             errorMessage = nil
@@ -308,8 +317,6 @@ final class HouseService: ObservableObject {
             errorMessage = "Konnte Finanzberatung nicht laden: \(error.localizedDescription)"
         }
     }
-    
-    
     
     // MARK: - Mietspiegel / Markt-Benchmark laden
 
@@ -408,7 +415,6 @@ final class HouseService: ObservableObject {
             errorMessage = "Konnte Reparatur-Einschätzung nicht laden: \(error.localizedDescription)"
         }
     }
-
 
     // MARK: - Demo-Haus
 

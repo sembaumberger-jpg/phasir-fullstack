@@ -24,6 +24,14 @@ final class HouseListViewModel: ObservableObject {
         self.apiClient = apiClient
     }
 
+    // MARK: - Interne Helper
+
+    /// Spiegelt den Zustand aus dem Service ins ViewModel (Häuser + Fehlermeldung).
+    private func syncFromService() {
+        houses = service.houses
+        errorMessage = service.errorMessage
+    }
+
     // MARK: - Häuser laden / schreiben
 
     /// Lädt Häuser über den Service und spiegelt den Zustand in das ViewModel.
@@ -32,31 +40,32 @@ final class HouseListViewModel: ObservableObject {
         defer { isLoading = false }
 
         await service.fetchHouses()
-        houses = service.houses
-        errorMessage = service.errorMessage
+        syncFromService()
     }
 
     /// Legt ein neues Haus über das Backend an.
     func createHouse(request: CreateHouseRequest) async -> Bool {
         await service.createHouse(request)
-        houses = service.houses
-        errorMessage = service.errorMessage
+        syncFromService()
         return service.errorMessage == nil
     }
 
     /// Aktualisiert ein bestehendes Haus.
     func updateHouse(houseId: String, request: CreateHouseRequest) async -> Bool {
+        // Haus im Backend/Service aktualisieren
         await service.updateHouse(houseId: houseId, request: request)
-        houses = service.houses
-        errorMessage = service.errorMessage
+
+        // Danach den aktuellen Zustand aus dem Service übernehmen
+        // (statt irgendwo im UI manuell Indexe zu manipulieren)
+        syncFromService()
+
         return service.errorMessage == nil
     }
 
     /// Legt ein Demo-Haus an (für leere States / Tests).
     func createDemoHouse() async {
         await service.createDemoHouse()
-        houses = service.houses
-        errorMessage = service.errorMessage
+        syncFromService()
     }
 
     // MARK: - Energie-Assistent (pro Objekt, ruft /ai/energy-advice auf)

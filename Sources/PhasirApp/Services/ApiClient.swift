@@ -7,8 +7,9 @@ final class ApiClient {
 
     // 🆕 Singleton für einfache Nutzung im ganzen Projekt
     static let shared = ApiClient(
-        baseURL: URL(string: "http://localhost:4000")!
+        baseURL: URL(string: "https://phasir-fullstack-production.up.railway.app")!
     )
+
 
     let baseURL: URL
 

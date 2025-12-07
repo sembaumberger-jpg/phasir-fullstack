@@ -8,10 +8,11 @@ struct ContentView: View {
     @State private var isShowingRegister: Bool = false
 
     init() {
-        let baseURL = URL(string: "http://localhost:4000")!
+        // ✅ Backend-URL: Railway statt localhost
+        let baseURL = URL(string: "https://phasir-fullstack-production.up.railway.app")!
 
         let houseService = HouseService(baseURL: baseURL)
-        let apiClient = ApiClient(baseURL: baseURL)   // oder ApiClient.shared, beides ok
+        let apiClient = ApiClient(baseURL: baseURL)   // eigener Client mit gleicher Base-URL
         let sessionManager = SessionManager(apiClient: apiClient, houseService: houseService)
         let authViewModel = AuthViewModel(sessionManager: sessionManager)
 

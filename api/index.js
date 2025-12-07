@@ -41,9 +41,17 @@ const intervals = {
 };
 
 // 🆕 ---- News API Setup (für Immobilien-News) ----
-
 const NEWS_API_BASE_URL = process.env.NEWS_API_BASE_URL || '';
 const NEWS_API_KEY = process.env.NEWS_API_KEY || '';
+
+// 🗺️ ---- Google Places API Setup (für Dienstleister-Karte) ----
+const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
+
+if (!GOOGLE_PLACES_API_KEY) {
+  console.warn(
+    '⚠️ GOOGLE_PLACES_API_KEY fehlt. /vendors/search liefert nur Demo-Daten.'
+  );
+}
 
 if (!NEWS_API_BASE_URL || !NEWS_API_KEY) {
   console.warn(
@@ -53,7 +61,6 @@ if (!NEWS_API_BASE_URL || !NEWS_API_KEY) {
 
 // ---- OpenAI Setup ----
 const openaiApiKey = process.env.OPENAI_API_KEY || '';
-
 const openai = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
 
 if (!openai) {
@@ -365,8 +372,7 @@ const computeEnergyAdvice = (house) => {
       insights.push(
         'Zweifachverglasung ist solide – ein Wechsel auf dreifach kann in manchen Fällen sinnvoll sein.'
       );
-    } else
-    if (glazing.includes('einfach')) {
+    } else if (glazing.includes('einfach')) {
       score -= 10;
       insights.push(
         'Einfachverglasung verursacht große Wärmeverluste – hier besteht ein sehr großes Einsparpotenzial.'
@@ -535,6 +541,119 @@ Regeln:
   };
 }
 
+// ---------- PROBLEM-DIAGNOSE-KI ----------
+
+async function generateProblemAnalysisWithAI(house, description) {
+  // Fallback-Heuristik, falls kein OpenAI konfiguriert ist
+  if (!openai) {
+    const text = (description || '').toLowerCase();
+    let category = 'general';
+    if (
+      text.includes('heiz') ||
+      text.includes('radiator') ||
+      text.includes('wärme')
+    ) {
+      category = 'heating';
+    } else if (
+      text.includes('wasser') ||
+      text.includes('leitung') ||
+      text.includes('rohr')
+    ) {
+      category = 'water';
+    } else if (
+      text.includes('strom') ||
+      text.includes('elektr') ||
+      text.includes('sicherung')
+    ) {
+      category = 'electric';
+    } else if (text.includes('dach') || text.includes('regen')) {
+      category = 'roof';
+    } else if (
+      text.includes('schimmel') ||
+      text.includes('feucht') ||
+      text.includes('nass')
+    ) {
+      category = 'humidity';
+    }
+
+    return {
+      category,
+      urgency: 3,
+      likelyCause:
+        'Basierend auf einer einfachen Heuristik geschätzte Ursache.',
+      recommendedAction:
+        'Lass die genaue Ursache von einem passenden Fachbetrieb prüfen. Nutze die vorgeschlagenen Dienstleister in deiner Umgebung.',
+    };
+  }
+
+  const systemPrompt =
+    'Du bist ein erfahrener Gebäudetechniker und Hausmeister-Profi in Deutschland. ' +
+    'Du analysierst Probleme in Wohngebäuden und ordnest sie klaren Kategorien zu (heating, water, plumbing, roof, electric, humidity, energy, general). ' +
+    'Antworte ausschließlich im JSON-Format, ohne Fließtext außen herum.';
+
+  const userPrompt = `
+Der Nutzer beschreibt ein Problem in seinem Haus.
+
+Hausdaten (JSON):
+${JSON.stringify(house, null, 2)}
+
+Problembeschreibung:
+"${description}"
+
+Gib genau dieses JSON-Format zurück:
+
+{
+  "category": "heating" | "water" | "plumbing" | "roof" | "electric" | "humidity" | "energy" | "general",
+  "urgency": 1-5,
+  "likelyCause": "Kurzbeschreibung der wahrscheinlichen Ursache.",
+  "recommendedAction": "Konkrete Empfehlung, was der Eigentümer jetzt tun sollte."
+}
+
+Regeln:
+- Schreibe auf Deutsch.
+- Sei realistisch bei der Einschätzung der Dringlichkeit.
+- Wenn die Kategorie unklar ist, verwende "general".
+`;
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4.1-mini',
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+  });
+
+  const content = completion.choices[0]?.message?.content || '{}';
+
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch (err) {
+    console.error(
+      '🔴 Konnte AI-JSON für Problem-Analyse nicht parsen, fallback:',
+      err
+    );
+    return {
+      category: 'general',
+      urgency: 3,
+      likelyCause: 'Die KI konnte keine eindeutige Analyse durchführen.',
+      recommendedAction:
+        'Lass die genaue Ursache von einem passenden Fachbetrieb prüfen. Nutze die vorgeschlagenen Dienstleister in deiner Umgebung.',
+    };
+  }
+
+  return {
+    category: parsed.category || 'general',
+    urgency: typeof parsed.urgency === 'number' ? parsed.urgency : 3,
+    likelyCause:
+      parsed.likelyCause || 'Keine genaue Ursache ermittelt.',
+    recommendedAction:
+      parsed.recommendedAction ||
+      'Lass die genaue Ursache von einem passenden Fachbetrieb prüfen.',
+  };
+}
+
 // ---------- Mietspiegel / Markt-Benchmark ----------
 
 // grobe Heuristik für Markt-Miete je m²
@@ -633,8 +752,10 @@ const computeRentBenchmark = (housesList) => {
     houseEntries.length;
 
   const avgMarketPerSqm =
-    houseEntries.reduce((sum, e) => sum + e.estimatedMarketRentPerSqm, 0) /
-    houseEntries.length;
+    houseEntries.reduce(
+      (sum, e) => sum + e.estimatedMarketRentPerSqm,
+      0
+    ) / houseEntries.length;
 
   const avgDeviationPercent =
     ((avgRentPerSqm - avgMarketPerSqm) / avgMarketPerSqm) * 100;
@@ -943,7 +1064,10 @@ app.post(
       const advice = await generateEnergyAdviceWithAI(house);
       res.json(advice);
     } catch (error) {
-      console.error('Error in /ai/energy-advice, fallback to heuristic:', error);
+      console.error(
+        'Error in /ai/energy-advice, fallback to heuristic:',
+        error
+      );
       const advice = computeEnergyAdvice(house);
       res.json(advice);
     }
@@ -970,6 +1094,134 @@ app.post(
   })
 );
 
+// 🧠 ---------- PROBLEM-DIAGNOSE ENDPOINT ----------
+app.post(
+  '/ai/problem-diagnosis',
+  asyncRoute(async (req, res) => {
+    const { houseId, description } = req.body || {};
+
+    if (!houseId || !description) {
+      return res
+        .status(400)
+        .json({ error: 'houseId und description sind erforderlich.' });
+    }
+
+    const house = await fetchHouseById(houseId);
+    if (!house) {
+      return res.status(404).json({ error: 'House not found' });
+    }
+
+    const analysis = await generateProblemAnalysisWithAI(house, description);
+
+    // ein wenig angereicherte Antwort für die App
+    res.json({
+      category: analysis.category,
+      urgency: analysis.urgency,
+      likelyCause: analysis.likelyCause,
+      recommendedAction: analysis.recommendedAction,
+      houseName: house.name,
+      houseAddress: house.address,
+    });
+  })
+);
+
+// 🗺️ ---------- DIENSTLEISTER-SUCHE / VENDOR MAP ----------
+
+const CATEGORY_TO_QUERY = {
+  heating: 'Heizungsbauer',
+  water: 'Sanitär Notdienst',
+  plumbing: 'Sanitär Installateur',
+  roof: 'Dachdecker',
+  electric: 'Elektriker',
+  humidity: 'Schimmel Sanierung',
+  energy: 'Energieberatung',
+  general: 'Hausmeister Service',
+};
+
+app.get(
+  '/vendors/search',
+  asyncRoute(async (req, res) => {
+    const { category, address } = req.query || {};
+
+    if (!category || !address) {
+      return res
+        .status(400)
+        .json({ error: 'category und address sind erforderlich.' });
+    }
+
+    const queryLabel =
+      CATEGORY_TO_QUERY[category] || CATEGORY_TO_QUERY.general;
+
+    // Kein Places-Key -> Demo-Daten zurückgeben
+    if (!GOOGLE_PLACES_API_KEY) {
+      return res.json({
+        vendors: [
+          {
+            id: 'demo-1',
+            name: `${queryLabel} Musterbetrieb`,
+            lat: 50.0,
+            lng: 8.0,
+            rating: 4.7,
+            phone: null,
+            website: null,
+            address: `In der Nähe von ${address}`,
+            distanceKm: null,
+          },
+          {
+            id: 'demo-2',
+            name: `${queryLabel} & Sohn`,
+            lat: 50.01,
+            lng: 8.02,
+            rating: 4.5,
+            phone: null,
+            website: null,
+            address: `Region ${address}`,
+            distanceKm: null,
+          },
+        ],
+      });
+    }
+
+    const url = new URL(
+      'https://maps.googleapis.com/maps/api/place/textsearch/json'
+    );
+    url.search = new URLSearchParams({
+      query: `${queryLabel} in der Nähe von ${address}`,
+      key: GOOGLE_PLACES_API_KEY,
+      language: 'de',
+      region: 'de',
+    }).toString();
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(
+        '🔴 Places API responded with status:',
+        response.status
+      );
+      return res.status(502).json({
+        error: 'Failed to fetch vendors from Google Places API',
+      });
+    }
+
+    const data = await response.json();
+    const results = data.results || [];
+
+    const vendors = results.slice(0, 10).map((place) => ({
+      id: place.place_id || place.id || place.reference,
+      name: place.name,
+      lat: place.geometry?.location?.lat ?? null,
+      lng: place.geometry?.location?.lng ?? null,
+      rating: place.rating ?? null,
+      phone: null, // könnte über Place Details ergänzt werden
+      website: place.website ?? null,
+      address: place.formatted_address ?? null,
+      distanceKm: null, // könnte berechnet werden, wenn du die Haus-Koordinate kennst
+    }));
+
+    res.json({ vendors });
+  })
+);
+
 // ---------- AUTH ENDPOINTS (Register & Login mit Passwort) ----------
 
 // Registrierung
@@ -979,7 +1231,9 @@ app.post(
     const { email, password } = req.body || {};
 
     if (!email || !password) {
-      res.status(400).json({ error: 'E-Mail und Passwort sind erforderlich.' });
+      res
+        .status(400)
+        .json({ error: 'E-Mail und Passwort sind erforderlich.' });
       return;
     }
 
@@ -988,9 +1242,7 @@ app.post(
     // existiert schon?
     const existing = users.find((u) => u.email === normalizedEmail);
     if (existing) {
-      res
-        .status(409)
-        .json({ error: 'Für diese E-Mail existiert bereits ein Konto.' });
+      res.status(409).json({ error: 'Für diese E-Mail existiert bereits ein Konto.' });
       return;
     }
 
@@ -1067,7 +1319,6 @@ app.post(
 );
 
 // 🆕 ---------- REAL ESTATE NEWS ENDPOINT (mit fetch) ----------
-
 app.get(
   '/news/real-estate',
   asyncRoute(async (req, res) => {
@@ -1118,7 +1369,10 @@ app.get(
 
     const response = await fetch(url);
     if (!response.ok) {
-      console.error('🔴 News API responded with status:', response.status);
+      console.error(
+        '🔴 News API responded with status:',
+        response.status
+      );
       return res
         .status(502)
         .json({ error: 'Failed to fetch news from upstream API' });

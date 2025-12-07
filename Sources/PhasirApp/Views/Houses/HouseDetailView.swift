@@ -140,6 +140,12 @@ struct HouseDetailView: View {
                 .padding(.horizontal, 4)
                 .padding(.vertical, 12)
 
+            problemSolverSection     // <– NEU: USP-Bereich einfügen
+
+            Divider()
+                .padding(.horizontal, 4)
+                .padding(.vertical, 12)
+
             energyAssistantSection
 
             Divider()
@@ -155,6 +161,7 @@ struct HouseDetailView: View {
                 .shadow(color: .black.opacity(0.04), radius: 18, x: 0, y: 10)
         )
     }
+
 
     // MARK: - Überblick
 
@@ -233,6 +240,55 @@ struct HouseDetailView: View {
                 .foregroundColor(Color.phasirSecondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - USP-Sektion: Problem lösen
+    private var problemSolverSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Problem lösen")
+                        .font(.phasirSectionTitle)
+
+                    Text("Beschreibe ein aktuelles Problem in diesem Objekt und lass dir passende Fachbetriebe auf einer Karte anzeigen.")
+                        .font(.phasirCaption)
+                        .foregroundColor(Color.phasirSecondaryText)
+                }
+
+                Spacer()
+
+                Image(systemName: "sparkles")
+                    .foregroundColor(Color.phasirAccent)
+            }
+
+            NavigationLink {
+                ProblemSolverView(house: house)
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "wand.and.stars.inverse")
+                        .font(.body)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Problem-Assistent öffnen")
+                            .font(.phasirBody.weight(.semibold))
+                            .foregroundColor(.primary)
+                        Text("In wenigen Schritten von der Problembeschreibung zur konkreten Hilfe.")
+                            .font(.phasirCaption)
+                            .foregroundColor(Color.phasirSecondaryText)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.bold())
+                        .foregroundColor(Color.phasirSecondaryText)
+                }
+                .padding(.vertical, 10)
+                .padding(.horizontal, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.phasirAccent.opacity(0.06))
+                )
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     // MARK: - Wartungsstatus (inkl. nächster Komponente)
