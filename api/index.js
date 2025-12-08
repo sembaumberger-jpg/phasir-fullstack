@@ -151,9 +151,16 @@ try {
   }));
   console.log(`✅ Loaded ${houses.length} houses from persistence file`);
 } catch (err) {
-  // Wenn Datei fehlt oder Fehler beim Parsen → Demo-Daten verwenden
-  houses = demoHouses;
-  console.log('ℹ️ No houses.json found or failed to parse. Using demo houses.');
+  // Wenn Datei fehlt oder Fehler beim Parsen → Demo- oder leere Daten verwenden
+  // Standardmäßig laden wir KEINE Demo-Häuser mehr, damit Nutzer nicht ungefragt Testobjekte sehen.
+  // Über die Umgebungsvariable INCLUDE_DEMO_HOUSES=true lassen sich Demo-Objekte aktivieren.
+  const includeDemoHouses = process.env.INCLUDE_DEMO_HOUSES === 'true';
+  houses = includeDemoHouses ? demoHouses : [];
+  if (includeDemoHouses) {
+    console.log('ℹ️ No houses.json found or failed to parse. Using demo houses.');
+  } else {
+    console.log('ℹ️ No houses.json found or failed to parse. Starting with an empty house list.');
+  }
 }
 
 // Helper zum Speichern der Houses-Liste auf die Festplatte (nur wenn kein Supabase genutzt wird)
@@ -1093,7 +1100,12 @@ app.get(
   asyncRoute(async (req, res) => {
     // Nutze vorrangig die userId aus dem Bearer-Token, falls vorhanden.
     // Falls kein Token gesetzt ist, kann ownerId als Query-Parameter übergeben werden (z.B. für Admins).
+    // Erlaube den Zugriff nur, wenn der Benutzer authentifiziert ist. Ohne gültigen Bearer‑Token
+    // soll keine Hausliste ausgeliefert werden (ansonsten würden Demo‑Objekte oder fremde Objekte angezeigt).
     const ownerId = req.userId || req.query.ownerId || null;
+    if (!ownerId) {
+      return res.status(401).json({ error: 'Nicht authentifiziert.' });
+    }
     const result = await fetchAllHouses(ownerId);
     res.json(result.map(serializeHouse));
   })
