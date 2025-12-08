@@ -232,7 +232,29 @@ function saveUsersToFile() {
 // 🗝️ Sessions: ordnen Tokens den Benutzer-IDs zu.
 // Nach dem Login/Registrieren wird hier ein Eintrag abgelegt, damit wir den
 // Benutzer anhand des "Authorization: Bearer <token>" Headers identifizieren können.
-const sessions = [];
+// Damit bestehende Sessions nach einem Server-Neustart nicht verloren gehen,
+// werden sie in eine JSON-Datei geschrieben und beim Start geladen.
+
+const sessionsFilePath = './data/sessions.json';
+let sessions;
+
+try {
+  const sessionsData = fs.readFileSync(sessionsFilePath, 'utf8');
+  sessions = JSON.parse(sessionsData);
+  console.log(`✅ Loaded ${sessions.length} sessions from persistence file`);
+} catch (err) {
+  sessions = [];
+  console.log('ℹ️ No sessions.json found or failed to parse. Starting with empty session list.');
+}
+
+function saveSessionsToFile() {
+  try {
+    fs.writeFileSync(sessionsFilePath, JSON.stringify(sessions, null, 2));
+    console.log('💾 Sessions saved to persistence file');
+  } catch (e) {
+    console.error('🔴 Failed to write sessions.json:', e);
+  }
+}
 
 // 🔐 Authentication-Middleware: liest den Bearer-Token aus dem Header aus und setzt req.userId
 app.use((req, _res, next) => {
@@ -1729,6 +1751,9 @@ app.post(
     // Lege eine neue Session ab, damit der Token später dem User zugeordnet werden kann
     sessions.push({ token, userId: newUser.id });
 
+    // Speichere die neue Session, damit der ausgegebene Token auch nach einem Neustart gültig bleibt
+    saveSessionsToFile();
+
     res.status(201).json({
       token,
       userId: newUser.id,
@@ -1777,6 +1802,9 @@ app.post(
     const token = `sess-${uuid()}`;
     // Lege eine neue Session ab, damit der Token später dem User zugeordnet werden kann
     sessions.push({ token, userId: user.id });
+
+    // Persistiere auch die Sessions-Datei, damit Tokens bei Neustart erhalten bleiben
+    saveSessionsToFile();
 
     res.json({
       token,
