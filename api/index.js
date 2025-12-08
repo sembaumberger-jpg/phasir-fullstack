@@ -180,17 +180,54 @@ function saveHousesToFile() {
   }
 }
 
-// 🧑‍💻 In-Memory-User (für Entwicklung)
-// Achtung: wird bei jedem Server-Neustart zurückgesetzt.
-// Passwort für Demo-User: "test1234"
-const users = [
-  {
-    id: uuid(),
-    email: 'demo@phasir.app',
-    passwordHash: bcrypt.hashSync('test1234', 10),
-    createdAt: new Date().toISOString(),
-  },
-];
+// 🧑‍💻 Nutzerverwaltung
+// Alle Benutzer werden entweder aus einer persistierten JSON‑Datei gelesen oder
+// einmalig mit einem Demo‑Benutzer initialisiert. Dadurch bleiben Accounts
+// auch nach einem Server‑Neustart bestehen. Das Demo‑Konto ist optional und
+// dient nur zum schnellen Testen (E-Mail: demo@phasir.app, Passwort: test1234).
+
+// 🗂️ Datei, in der Nutzer beim Fallback-Modus gespeichert werden.
+const usersFilePath = './data/users.json';
+
+// Wir definieren users als mutable Variable, damit neue Accounts angelegt
+// und gespeichert werden können.
+let users;
+
+// Versuche, bestehende Benutzer aus dem Dateisystem zu laden. Falls keine
+// Datei existiert, wird sie später beim ersten Speichern automatisch
+// angelegt. In diesem Fall legen wir einen Demo‑Benutzer an, damit sich
+// mindestens ein Konto anmelden lässt.
+try {
+  const userFileData = fs.readFileSync(usersFilePath, 'utf8');
+  users = JSON.parse(userFileData);
+  console.log(`✅ Loaded ${users.length} users from persistence file`);
+} catch (err) {
+  // Falls das Laden fehlschlägt oder die Datei fehlt, initialisiere mit einem
+  // Demo‑Benutzer. Dieser kann anschließend gelöscht oder überschrieben
+  // werden, sobald echte Nutzer registriert sind.
+  users = [
+    {
+      id: uuid(),
+      email: 'demo@phasir.app',
+      passwordHash: bcrypt.hashSync('test1234', 10),
+      createdAt: new Date().toISOString(),
+    },
+  ];
+  console.log('ℹ️ No users.json found or failed to parse. Using demo user.');
+}
+
+// Hilfsfunktion zum Persistieren der Nutzerliste. Ruft man nach dem
+// Registrieren eines neuen Kontos auf, werden die Daten dauerhaft in
+// users.json gespeichert. Beim Einsatz von Supabase wird die Datei zwar
+// geschrieben, sie hat dann aber keine praktische Wirkung.
+function saveUsersToFile() {
+  try {
+    fs.writeFileSync(usersFilePath, JSON.stringify(users, null, 2));
+    console.log('💾 Users saved to persistence file');
+  } catch (e) {
+    console.error('🔴 Failed to write users.json:', e);
+  }
+}
 
 // 🗝️ Sessions: ordnen Tokens den Benutzer-IDs zu.
 // Nach dem Login/Registrieren wird hier ein Eintrag abgelegt, damit wir den
@@ -906,71 +943,97 @@ const computeRentBenchmark = (housesList) => {
 
 // ---------- Payload-Parser ----------
 
-const parseHousePayload = (payload) => ({
-  ownerId: payload.ownerId ?? null,
-  ownerName: payload.ownerName ?? 'Demo Nutzer',
-  name: payload.name,
-  address: payload.address,
-  buildYear: Number(payload.buildYear),
-  heatingType: payload.heatingType,
-  heatingInstallYear: Number(payload.heatingInstallYear),
-  lastHeatingService: payload.lastHeatingService,
-  roofInstallYear: Number(payload.roofInstallYear),
-  lastRoofCheck: payload.lastRoofCheck || `${payload.roofInstallYear}-01-01`,
-  windowInstallYear: Number(payload.windowInstallYear),
-  lastSmokeCheck: payload.lastSmokeCheck,
+const parseHousePayload = (payload) => {
+  // Bestimme ein sinnvolles Baujahr (Default: aktuelles Jahr)
+  const currentYear = new Date().getFullYear();
+  const buildYearRaw = payload.buildYear !== undefined && payload.buildYear !== null && payload.buildYear !== '' ? Number(payload.buildYear) : null;
+  const buildYear = Number.isFinite(buildYearRaw) ? buildYearRaw : currentYear;
 
-  // --- Energieprofil ---
-  livingArea: payload.livingArea ?? null,
-  numberOfFloors: payload.numberOfFloors ?? null,
-  propertyType: payload.propertyType ?? null,
-  residentsCount: payload.residentsCount ?? null,
-  locationType: payload.locationType ?? null,
-  insulationLevel: payload.insulationLevel ?? null,
-  windowGlazing: payload.windowGlazing ?? null,
-  roofType: payload.roofType ?? null,
-  hasSolarPanels: payload.hasSolarPanels ?? null,
-  energyCertificateClass: payload.energyCertificateClass ?? null,
-  estimatedAnnualEnergyConsumption:
-    payload.estimatedAnnualEnergyConsumption ?? null,
-  typicalEmptyHoursPerDay: payload.typicalEmptyHoursPerDay ?? null,
-  hasHomeOfficeUsage: payload.hasHomeOfficeUsage ?? null,
-  comfortPreference: payload.comfortPreference ?? null,
+  // Installationsjahre, fallen auf das Baujahr zurück, falls nicht angegeben
+  const heatingInstallRaw = payload.heatingInstallYear !== undefined && payload.heatingInstallYear !== null && payload.heatingInstallYear !== '' ? Number(payload.heatingInstallYear) : null;
+  const heatingInstallYear = Number.isFinite(heatingInstallRaw) ? heatingInstallRaw : buildYear;
+  const roofInstallRaw = payload.roofInstallYear !== undefined && payload.roofInstallYear !== null && payload.roofInstallYear !== '' ? Number(payload.roofInstallYear) : null;
+  const roofInstallYear = Number.isFinite(roofInstallRaw) ? roofInstallRaw : buildYear;
+  const windowInstallRaw = payload.windowInstallYear !== undefined && payload.windowInstallYear !== null && payload.windowInstallYear !== '' ? Number(payload.windowInstallYear) : null;
+  const windowInstallYear = Number.isFinite(windowInstallRaw) ? windowInstallRaw : buildYear;
 
-  // --- Sicherheitsprofil ---
-  doorSecurityLevel: payload.doorSecurityLevel ?? null,
-  hasGroundFloorWindowSecurity:
-    payload.hasGroundFloorWindowSecurity ?? null,
-  hasAlarmSystem: payload.hasAlarmSystem ?? null,
-  hasCameras: payload.hasCameras ?? null,
-  hasSmartLocks: payload.hasSmartLocks ?? null,
-  hasMotionLightsOutside: payload.hasMotionLightsOutside ?? null,
-  hasSmokeDetectorsAllRooms: payload.hasSmokeDetectorsAllRooms ?? null,
-  hasCO2Detector: payload.hasCO2Detector ?? null,
-  neighbourhoodRiskLevel: payload.neighbourhoodRiskLevel ?? null,
+  // Dates: falls nicht angegeben, null oder sinnvolle Defaults
+  const lastHeatingService = payload.lastHeatingService ?? null;
+  // Wenn lastRoofCheck nicht gesetzt, verwende das Dach-Installationsjahr
+  const lastRoofCheck = payload.lastRoofCheck ?? `${roofInstallYear}-01-01`;
+  const lastSmokeCheck = payload.lastSmokeCheck ?? null;
 
-  // --- Nutzung & Finanzen ---
-  usageType: payload.usageType ?? null,
+  return {
+    ownerId: payload.ownerId ?? null,
+    ownerName: payload.ownerName ?? 'Demo Nutzer',
+    // Leere oder fehlende Namen werden zu "Neue Immobilie"
+    name:
+      payload.name && String(payload.name).trim()
+        ? String(payload.name).trim()
+        : 'Neue Immobilie',
+    // Adresse darf leer sein; Standardwert ist leerer String
+    address: payload.address ?? '',
+    buildYear,
+    heatingType: payload.heatingType ?? '',
+    heatingInstallYear,
+    lastHeatingService,
+    roofInstallYear,
+    lastRoofCheck,
+    windowInstallYear,
+    lastSmokeCheck,
 
-  monthlyRentCold: payload.monthlyRentCold ?? null,
-  monthlyRentWarm: payload.monthlyRentWarm ?? null,
-  expectedVacancyRate: payload.expectedVacancyRate ?? null,
+    // --- Energieprofil ---
+    livingArea: payload.livingArea ?? null,
+    numberOfFloors: payload.numberOfFloors ?? null,
+    propertyType: payload.propertyType ?? null,
+    residentsCount: payload.residentsCount ?? null,
+    locationType: payload.locationType ?? null,
+    insulationLevel: payload.insulationLevel ?? null,
+    windowGlazing: payload.windowGlazing ?? null,
+    roofType: payload.roofType ?? null,
+    hasSolarPanels: payload.hasSolarPanels ?? null,
+    energyCertificateClass: payload.energyCertificateClass ?? null,
+    estimatedAnnualEnergyConsumption:
+      payload.estimatedAnnualEnergyConsumption ?? null,
+    typicalEmptyHoursPerDay: payload.typicalEmptyHoursPerDay ?? null,
+    hasHomeOfficeUsage: payload.hasHomeOfficeUsage ?? null,
+    comfortPreference: payload.comfortPreference ?? null,
 
-  monthlyUtilities: payload.monthlyUtilities ?? null,
-  monthlyHoaFees: payload.monthlyHoaFees ?? null,
-  insurancePerYear: payload.insurancePerYear ?? null,
-  maintenanceBudgetPerYear: payload.maintenanceBudgetPerYear ?? null,
+    // --- Sicherheitsprofil ---
+    doorSecurityLevel: payload.doorSecurityLevel ?? null,
+    hasGroundFloorWindowSecurity:
+      payload.hasGroundFloorWindowSecurity ?? null,
+    hasAlarmSystem: payload.hasAlarmSystem ?? null,
+    hasCameras: payload.hasCameras ?? null,
+    hasSmartLocks: payload.hasSmartLocks ?? null,
+    hasMotionLightsOutside: payload.hasMotionLightsOutside ?? null,
+    hasSmokeDetectorsAllRooms: payload.hasSmokeDetectorsAllRooms ?? null,
+    hasCO2Detector: payload.hasCO2Detector ?? null,
+    neighbourhoodRiskLevel: payload.neighbourhoodRiskLevel ?? null,
 
-  purchasePrice: payload.purchasePrice ?? null,
-  equity: payload.equity ?? null,
-  remainingLoanAmount: payload.remainingLoanAmount ?? null,
-  interestRate: payload.interestRate ?? null,
-  loanMonthlyPayment: payload.loanMonthlyPayment ?? null,
+    // --- Nutzung & Finanzen ---
+    usageType: payload.usageType ?? null,
 
-  // Optional: Koordinaten, wenn der Client sie liefert
-  lat: payload.lat ?? payload.latitude ?? null,
-  lng: payload.lng ?? payload.longitude ?? null,
-});
+    monthlyRentCold: payload.monthlyRentCold ?? null,
+    monthlyRentWarm: payload.monthlyRentWarm ?? null,
+    expectedVacancyRate: payload.expectedVacancyRate ?? null,
+
+    monthlyUtilities: payload.monthlyUtilities ?? null,
+    monthlyHoaFees: payload.monthlyHoaFees ?? null,
+    insurancePerYear: payload.insurancePerYear ?? null,
+    maintenanceBudgetPerYear: payload.maintenanceBudgetPerYear ?? null,
+
+    purchasePrice: payload.purchasePrice ?? null,
+    equity: payload.equity ?? null,
+    remainingLoanAmount: payload.remainingLoanAmount ?? null,
+    interestRate: payload.interestRate ?? null,
+    loanMonthlyPayment: payload.loanMonthlyPayment ?? null,
+
+    // Optional: Koordinaten, wenn der Client sie liefert
+    lat: payload.lat ?? payload.latitude ?? null,
+    lng: payload.lng ?? payload.longitude ?? null,
+  };
+};
 
 // ---------- DB Funktionen ----------
 
@@ -1130,25 +1193,16 @@ app.post(
       return res.status(401).json({ error: 'Nicht authentifiziert.' });
     }
 
-    // Basis-Felder, die zwingend vorhanden sein müssen
-    const required = [
-      'name',
-      'address',
-      'buildYear',
-      'heatingType',
-      'heatingInstallYear',
-      'roofInstallYear',
-      'windowInstallYear',
-    ];
-    const missing = required.filter((key) => req.body?.[key] === undefined || req.body?.[key] === null || req.body?.[key] === '');
-    if (missing.length) {
-      return res.status(400).json({ error: `Missing fields: ${missing.join(', ')}` });
-    }
+    // Bestimme den aktuellen Benutzername (z. B. E-Mail als Besitzername). Falls der User nicht
+    // gefunden wird, verwende einen generischen Platzhalter. Wir ignorieren ownerId aus dem
+    // Request-Body und setzen ihn immer auf den eingeloggten Nutzer. Dadurch kann kein
+    // User versehentlich die Zuordnung manipulieren.
+    const user = users.find((u) => u.id === userId);
+    const ownerName = user ? user.email : 'Unbekannter Eigentümer';
+    const payload = { ...req.body, ownerId: userId, ownerName };
 
-    // Setze den Besitzer des Hauses immer anhand des eingeloggten Nutzers. Dadurch wird ownerId
-    // konsistent vergeben und kann später zum Filtern benutzt werden. Eingehende ownerId wird ignoriert.
-    const payload = { ...req.body, ownerId: userId };
-
+    // Erzeuge das Haus ohne strikte Feldvalidierung. Fehlende Werte
+    // werden in parseHousePayload mit sinnvollen Defaults belegt (z. B. "Neue Immobilie" als Name).
     const house = await createHouse(payload);
 
     // Persistiere ins Dateisystem, falls kein Supabase vorhanden ist
@@ -1175,8 +1229,10 @@ app.put(
     if (existing.ownerId && existing.ownerId !== userId) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    // Setze ownerId immer auf den eingeloggten Nutzer, damit die Zuordnung konsistent bleibt
-    const payload = { ...req.body, ownerId: userId };
+    // Setze ownerId und ownerName immer auf den eingeloggten Nutzer, damit die Zuordnung konsistent bleibt
+    const user = users.find((u) => u.id === userId);
+    const ownerName = user ? user.email : 'Unbekannter Eigentümer';
+    const payload = { ...req.body, ownerId: userId, ownerName };
     const house = await updateHouseById(req.params.id, payload);
     if (!house) {
       return res.status(404).json({ error: 'House not found' });
@@ -1664,6 +1720,10 @@ app.post(
     };
 
     users.push(newUser);
+
+    // Persistiere den neuen Benutzer ins Dateisystem (unabhängig von Supabase). Dadurch bleiben Konten
+    // auch nach einem Server-Neustart bestehen. Fehlschläge werden protokolliert.
+    saveUsersToFile();
 
     const token = `sess-${uuid()}`;
     // Lege eine neue Session ab, damit der Token später dem User zugeordnet werden kann
