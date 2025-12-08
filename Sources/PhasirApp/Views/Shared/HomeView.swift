@@ -1,13 +1,26 @@
 import SwiftUI
 
 struct HomeView: View {
+    /// ViewModel für die Hausliste und allgemeine Daten
     @ObservedObject var viewModel: HouseListViewModel
+    /// Service zum Laden weiterer Daten wie z.B. das Problem‑Radar
+    private let houseService: HouseService
+    /// ViewModel für das Problem‑Radar, das innerhalb des Home‑Tabs angezeigt wird
+    @StateObject private var radarViewModel: ProblemRadarViewModel
 
     @State private var selectedTab: HomeTab = .actions
 
     enum HomeTab {
         case actions
         case news
+    }
+
+    /// Initializer, der sowohl den bestehenden HouseListViewModel als auch den HouseService entgegennimmt.
+    /// Beim Erstellen des HomeViews wird zusätzlich ein ProblemRadarViewModel erzeugt.
+    init(viewModel: HouseListViewModel, houseService: HouseService) {
+        self.viewModel = viewModel
+        self.houseService = houseService
+        _radarViewModel = StateObject(wrappedValue: ProblemRadarViewModel(houseService: houseService))
     }
 
     var body: some View {
@@ -31,9 +44,11 @@ struct HomeView: View {
             }
         }
         .task {
+            // Lade alle nötigen Daten für die Aktionen und das Radar
             await viewModel.load()
             await viewModel.loadNews()
             await viewModel.loadRentBenchmark()
+            await radarViewModel.load()
         }
     }
 
@@ -87,6 +102,7 @@ struct HomeView: View {
     private var actionCenterContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                // ----- Action Center: Wartungen, Cashflow & Mietniveau -----
                 if actionItems.isEmpty {
                     VStack(spacing: 10) {
                         Image(systemName: "checkmark.circle")
@@ -96,7 +112,7 @@ struct HomeView: View {
                         Text("Aktuell keine dringenden Aktionen")
                             .font(.system(size: 17, weight: .semibold))
 
-                        Text("Sobald Wartungen anstehen, Mieten stark vom Markt abweichen oder Objekte negativ laufen, erscheinen sie hier als To-dos.")
+                        Text("Sobald Wartungen anstehen, Mieten stark vom Markt abweichen oder Objekte negativ laufen, erscheinen sie hier als To‑dos.")
                             .font(.system(size: 13))
                             .foregroundColor(.phasirSecondaryText)
                             .multilineTextAlignment(.center)
@@ -124,6 +140,9 @@ struct HomeView: View {
                     .padding(.horizontal, PhasirDesign.screenPadding)
                     .padding(.bottom, 24)
                 }
+
+                // ----- Problem‑Radar: prognostizierte Probleme -----
+                radarSection
             }
         }
         .background(Color.phasirBackground.ignoresSafeArea())
@@ -223,6 +242,105 @@ struct HomeView: View {
                 .fill(Color.phasirBackground)
         )
         .foregroundColor(Color.primary)
+    }
+
+    // MARK: - Problem‑Radar Section
+
+    /// Zusammenfassung aller prognostizierten Probleme in einem separaten Abschnitt unterhalb des Action Centers.
+    /// Zeigt einen Titel, eine optionale Ladeanzeige, einen leeren Hinweis oder für jedes Haus eine Liste von Issues.
+    private var radarSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Problem‑Radar")
+                .font(.system(size: 18, weight: .semibold))
+                .padding(.horizontal, PhasirDesign.screenPadding)
+                .padding(.top, 8)
+
+            Text("Prognostizierte Probleme und Wartungsrisiken deiner Immobilien.")
+                .font(.system(size: 13))
+                .foregroundColor(.phasirSecondaryText)
+                .padding(.horizontal, PhasirDesign.screenPadding)
+
+            if radarViewModel.isLoading {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .padding(.vertical, 20)
+            } else if radarIssues.isEmpty {
+                Text("Derzeit liegen keine prognostizierten Probleme vor.")
+                    .font(.system(size: 14))
+                    .foregroundColor(.phasirSecondaryText)
+                    .padding(.horizontal, PhasirDesign.screenPadding)
+                    .padding(.vertical, 16)
+            } else {
+                ForEach(radarViewModel.houses) { radar in
+                    if !radar.issues.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(radar.name)
+                                .font(.system(size: 15, weight: .semibold))
+                                .padding(.bottom, 2)
+
+                            ForEach(radar.issues) { issue in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Circle()
+                                        .fill(color(for: issue.severity))
+                                        .frame(width: 8, height: 8)
+                                        .padding(.top, 5)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(issue.summary)
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundColor(.primary)
+                                        Text(issue.recommendation)
+                                            .font(.system(size: 13))
+                                            .foregroundColor(.phasirSecondaryText)
+                                    }
+                                    Spacer()
+                                    Text(severityLabel(for: issue.severity))
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(color(for: issue.severity))
+                                }
+                                .padding(.vertical, 6)
+                                if issue.id != radar.issues.last?.id {
+                                    Divider()
+                                }
+                            }
+                        }
+                        .padding(14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(Color.phasirCard)
+                                .shadow(color: .black.opacity(0.04), radius: 10, x: 0, y: 4)
+                        )
+                        .padding(.horizontal, PhasirDesign.screenPadding)
+                        .padding(.bottom, 12)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Aggregiert alle Issues aus dem Problem‑Radar, um schnell zu prüfen, ob welche vorhanden sind.
+    private var radarIssues: [ProblemPrediction] {
+        radarViewModel.houses.flatMap { $0.issues }
+    }
+
+    /// Ermittelt eine passende Farbe für den Schweregrad eines Problems
+    private func color(for severity: String) -> Color {
+        switch severity.lowercased() {
+        case "high": return .red
+        case "medium": return .orange
+        default: return .green
+        }
+    }
+
+    /// Konvertiert die englische Severity‑Angabe aus dem Backend in eine deutschsprachige Beschriftung
+    private func severityLabel(for severity: String) -> String {
+        switch severity.lowercased() {
+        case "high": return "Hoch"
+        case "medium": return "Mittel"
+        default: return "Niedrig"
+        }
     }
 
     // MARK: - NEWS

@@ -37,6 +37,8 @@
 		2CCE8E1B2EDE44A500E4A18F /* RentBenchmarkAdvice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CCE8E1A2EDE44A500E4A18F /* RentBenchmarkAdvice.swift */; };
 		2CD5C7562EDCB5B60082C757 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD5C7552EDCB5B60082C757 /* DesignSystem.swift */; };
 		2CD5C7582EDD01BC0082C757 /* EnergyAdvice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD5C7572EDD01BC0082C757 /* EnergyAdvice.swift */; };
+		2CE8DB722EE6F3AF00824ADE /* ProblemSolverTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CE8DB712EE6F3AF00824ADE /* ProblemSolverTabView.swift */; };
+		2CE8DB742EE6FA9500824ADE /* WeatherAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CE8DB732EE6FA9500824ADE /* WeatherAlert.swift */; };
 		2CF49CF72EE38FE8000254D9 /* Registerview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CF49CF62EE38FE7000254D9 /* Registerview.swift */; };
 		2CF49CF92EE3A9C9000254D9 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CF49CF82EE3A9C9000254D9 /* HomeView.swift */; };
 		2CF49CFD2EE3B5EB000254D9 /* LaunchScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CF49CFC2EE3B5EB000254D9 /* LaunchScreenView.swift */; };
@@ -74,6 +76,8 @@
 		2CCE8E1A2EDE44A500E4A18F /* RentBenchmarkAdvice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RentBenchmarkAdvice.swift; sourceTree = "<group>"; };
 		2CD5C7552EDCB5B60082C757 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		2CD5C7572EDD01BC0082C757 /* EnergyAdvice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyAdvice.swift; sourceTree = "<group>"; };
+		2CE8DB712EE6F3AF00824ADE /* ProblemSolverTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProblemSolverTabView.swift; sourceTree = "<group>"; };
+		2CE8DB732EE6FA9500824ADE /* WeatherAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherAlert.swift; sourceTree = "<group>"; };
 		2CF49CF62EE38FE7000254D9 /* Registerview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Registerview.swift; sourceTree = "<group>"; };
 		2CF49CF82EE3A9C9000254D9 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		2CF49CFC2EE3B5EB000254D9 /* LaunchScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchScreenView.swift; sourceTree = "<group>"; };
@@ -156,6 +160,7 @@
 				2CCE8E122EDDCEE900E4A18F /* InsightsView.swift */,
 				2C12C3A92EE1E9530084D8B6 /* NewsModels.swift */,
 				2CF49CF82EE3A9C9000254D9 /* HomeView.swift */,
+				2CE8DB712EE6F3AF00824ADE /* ProblemSolverTabView.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -193,6 +198,7 @@
 				2CCE8E1A2EDE44A500E4A18F /* RentBenchmarkAdvice.swift */,
 				2C56713A2EE6181B007CECB0 /* ProblemSolverModels.swift */,
 				2C5671402EE62E46007CECB0 /* ProblemRadarViewModel.swift */,
+				2CE8DB732EE6FA9500824ADE /* WeatherAlert.swift */,
 			);
 			name = Models;
 			path = ../Models;
@@ -296,6 +302,8 @@
 				2C4597FF2EDB110D0098C932 /* HouseListView.swift in Sources */,
 				2C56713B2EE6181B007CECB0 /* ProblemSolverModels.swift in Sources */,
 				2CCE8E152EDDEE3600E4A18F /* FinanceAdvice.swift in Sources */,
+				2CE8DB742EE6FA9500824ADE /* WeatherAlert.swift in Sources */,
+				2CE8DB722EE6F3AF00824ADE /* ProblemSolverTabView.swift in Sources */,
 				2C45980A2EDB110D0098C932 /* HouseListViewModel.swift in Sources */,
 				2C5671432EE62EF8007CECB0 /* ProblemInterviewView.swift in Sources */,
 				2CF49CFD2EE3B5EB000254D9 /* LaunchScreenView.swift in Sources */,

@@ -39,14 +39,12 @@ struct MainTabView: View {
                 Label("Insights", systemImage: "chart.bar.xaxis")
             }
 
-            // 🧭 RADAR: Problem-Radar / Prognosen
+            // 🔮 SOLVER: Neuer Tab für den Problem‑Solver
             NavigationStack {
-                ProblemRadarView(
-                    viewModel: ProblemRadarViewModel(houseService: houseService)
-                )
+                ProblemSolverTabView(viewModel: houseListViewModel, houseService: houseService)
             }
             .tabItem {
-                Label("Radar", systemImage: "exclamationmark.triangle.fill")
+                Label("Solver", systemImage: "wand.and.stars")
             }
 
             // PROFIL

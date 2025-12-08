@@ -44,10 +44,22 @@ struct ProblemPrediction: Codable, Identifiable {
 }
 
 /// Sammlung aller prognostizierten Probleme eines Hauses
+/// Sammlung aller prognostizierten Probleme eines Hauses
+///
+/// Der Server liefert die Felder `houseId` und `houseName`, daher werden sie mit
+/// CodingKeys auf die Properties `id` und `name` gemappt. Ohne diese explizite
+/// Zuordnung schlägt die Decodierung fehl ("keyNotFound"), weil `id` nicht im
+/// JSON vorhanden ist.
 struct HouseProblemRadar: Codable, Identifiable {
     let id: String
     let name: String
     let issues: [ProblemPrediction]
+    
+    private enum CodingKeys: String, CodingKey {
+        case id = "houseId"
+        case name = "houseName"
+        case issues
+    }
 }
 
 /// Antwort des Problemradar-Endpunkts

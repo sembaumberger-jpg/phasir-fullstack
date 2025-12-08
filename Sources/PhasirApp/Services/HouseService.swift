@@ -22,6 +22,10 @@ final class HouseService: ObservableObject {
     // 🧭 Problem-Radar (prognostizierte Probleme je Haus)
     @Published private(set) var problemRadar: [HouseProblemRadar] = []
 
+    // 🌀 Wetterwarnungen, gruppiert nach Haus-ID
+    // Enthält die aktuellen Wetterwarnungen, sofern vom Backend abgerufen.
+    @Published private(set) var weatherAlertsByHouseId: [String: [WeatherAlert]] = [:]
+
     let baseURL: URL
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
@@ -64,6 +68,69 @@ final class HouseService: ObservableObject {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         self.encoder = encoder
+
+        // Die standardmäßige Date-Decoding-Strategie deckt sowohl ISO8601 mit Millisekunden
+        // als auch ohne Millisekunden ab und versucht zusätzlich ein Format ohne Zeitzone.
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+            // Zuerst ISO8601 mit Millisekunden
+            if let date = isoWithMs.date(from: dateString) {
+                return date
+            }
+            // Dann ISO8601 ohne Millisekunden
+            if let date = isoNoMs.date(from: dateString) {
+                return date
+            }
+            // Fallback: ISO8601 ohne Zeitzoneninformationen (z. B. aus Wetterwarnungen)
+            let isoNoZone = ISO8601DateFormatter()
+            isoNoZone.formatOptions = [.withInternetDateTime]
+            if let date = isoNoZone.date(from: dateString) {
+                return date
+            }
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Expected ISO8601 date, got \(dateString)"
+            )
+        }
+    }
+
+    // MARK: - Wetterwarnungen laden
+
+    /// Lädt die Wetterwarnungen für ein bestimmtes Haus.
+    ///
+    /// Dieser Endpunkt erwartet, dass das Backend die Koordinaten der Immobilie kennt und
+    /// die Bright‑Sky‑API für Wetterwarnungen abruft. Die Antwort sollte dem
+    /// `WeatherAlert`‑Modell entsprechen. Nach erfolgreichem Laden wird das
+    /// Ergebnis in `weatherAlertsByHouseId` gespeichert.
+    func fetchWeatherAlerts(for houseId: String) async {
+        guard !houseId.isEmpty else { return }
+
+        let endpoint = baseURL
+            .appendingPathComponent("weather-alerts")
+            .appendingPathComponent(houseId)
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "GET"
+        applyAuthHeaders(to: &request)
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
+                throw URLError(.badServerResponse)
+            }
+            struct AlertsWrapper: Codable {
+                let alerts: [WeatherAlert]
+            }
+            let wrapper = try decoder.decode(AlertsWrapper.self, from: data)
+            // Thread‑safe Update on MainActor
+            await MainActor.run {
+                weatherAlertsByHouseId[houseId] = wrapper.alerts
+            }
+        } catch {
+            print("❌ Fehler in fetchWeatherAlerts:", error)
+            await MainActor.run {
+                weatherAlertsByHouseId[houseId] = []
+            }
+        }
     }
 
     // MARK: - Auth-Kontext aktualisieren

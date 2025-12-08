@@ -1,10 +1,13 @@
 import Foundation
 
+/// ViewModel für das Problem-Radar.
+/// Lädt für den aktuell angemeldeten Nutzer alle prognostizierten Probleme und stellt sie für die UI bereit.
 @MainActor
-final class ProblemRadarViewModel: ObservableObject {
+class ProblemRadarViewModel: ObservableObject {
+    /// Liste aller Häuser mit ihren Prognosen
     @Published var houses: [HouseProblemRadar] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
+    /// Flag, ob die Daten aktuell geladen werden
+    @Published var isLoading: Bool = false
 
     private let houseService: HouseService
 
@@ -12,14 +15,16 @@ final class ProblemRadarViewModel: ObservableObject {
         self.houseService = houseService
     }
 
+    /// Lädt die Problemprognosen über den HouseService
+    ///
+    /// Die Methode `fetchProblemRadar()` im HouseService schreibt das Ergebnis
+    /// in `houseService.problemRadar`. Sie liefert keinen Rückgabewert, daher
+    /// setzen wir anschließend `houses` aus dieser Property.
     func load() async {
+        guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
-
-        // Der Service schreibt intern in houseService.problemRadar
         await houseService.fetchProblemRadar()
-
-        // 👉 danach holen wir die Daten aus dem Service
-        self.houses = houseService.problemRadar
+        houses = houseService.problemRadar
     }
 }

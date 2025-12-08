@@ -72,6 +72,9 @@ if (!openai) {
 }
 
 // In-Memory Demo-Daten (Fallback, falls Supabase nicht konfiguriert ist)
+// In‑Memory Demo-Daten (Fallback, falls Supabase nicht konfiguriert ist)
+// Die Demo‑Häuser enthalten jetzt auch grobe Koordinaten (lat/lng),
+// damit Wetterwarnungen über den Bright‑Sky‑Endpoint abgerufen werden können.
 const houses = [
   {
     id: uuid(),
@@ -86,6 +89,9 @@ const houses = [
     lastRoofCheck: new Date('2022-07-01'),
     windowInstallYear: 2018,
     lastSmokeCheck: new Date('2024-06-12'),
+    // Grobe Koordinaten für Köln (nur Demo)
+    lat: 50.940664,
+    lng: 6.959912,
   },
   {
     id: uuid(),
@@ -100,6 +106,8 @@ const houses = [
     lastRoofCheck: new Date('2023-09-15'),
     windowInstallYear: 2015,
     lastSmokeCheck: new Date('2023-12-01'),
+    lat: 47.497954,
+    lng: 11.095993,
   },
   {
     id: uuid(),
@@ -114,6 +122,8 @@ const houses = [
     lastRoofCheck: new Date('2021-04-20'),
     windowInstallYear: 2017,
     lastSmokeCheck: new Date('2024-04-09'),
+    lat: 52.531677,
+    lng: 13.390364,
   },
 ];
 
@@ -144,6 +154,10 @@ const fromSupabaseRow = (row) => ({
   lastRoofCheck: row.lastroofcheck,
   windowInstallYear: row.windowinstallyear,
   lastSmokeCheck: row.lastsmokecheck,
+
+  // Koordinaten (Latitude/Longitude) – optional
+  lat: row.lat ?? row.latitude ?? null,
+  lng: row.lng ?? row.longitude ?? null,
 
   // --- Energieprofil ---
   livingArea: row.livingarea ?? null,
@@ -198,6 +212,9 @@ const ensureHouseNumbers = (house) => ({
   heatingInstallYear: Number(house.heatingInstallYear),
   roofInstallYear: Number(house.roofInstallYear),
   windowInstallYear: Number(house.windowInstallYear),
+  // Stelle sicher, dass Koordinaten als Zahlen vorliegen
+  lat: house.lat !== undefined ? Number(house.lat) : house.lat,
+  lng: house.lng !== undefined ? Number(house.lng) : house.lng,
 });
 
 // internes House-Objekt -> Supabase-Row
@@ -271,6 +288,10 @@ const toSupabasePayload = (house) => {
     remainingloanamount: normalized.remainingLoanAmount ?? null,
     interestrate: normalized.interestRate ?? null,
     loanmonthlypayment: normalized.loanMonthlyPayment ?? null,
+
+    // Koordinaten, falls vorhanden
+    lat: normalized.lat ?? null,
+    lng: normalized.lng ?? null,
   };
 };
 
@@ -874,6 +895,10 @@ const parseHousePayload = (payload) => ({
   remainingLoanAmount: payload.remainingLoanAmount ?? null,
   interestRate: payload.interestRate ?? null,
   loanMonthlyPayment: payload.loanMonthlyPayment ?? null,
+
+  // Optional: Koordinaten, wenn der Client sie liefert
+  lat: payload.lat ?? payload.latitude ?? null,
+  lng: payload.lng ?? payload.longitude ?? null,
 });
 
 // ---------- DB Funktionen ----------
@@ -1051,6 +1076,49 @@ app.put(
     if (!house)
       return res.status(404).json({ error: 'House not found' });
     res.json(serializeHouse(house));
+  })
+);
+
+// ---------- Wetterwarnungen ----------
+// Gibt eine Liste von Wetterwarnungen (via Bright‑Sky) für die angegebene Haus‑ID zurück.
+// Die Immobilie muss Koordinaten (lat/lng) besitzen. Wenn das nicht der Fall ist,
+// wird eine leere Liste zurückgegeben. Bei Supabase‑Betrieb sollte die Tabelle
+// entsprechende Spalten für Latitude und Longitude enthalten und in fetchHouseById
+// integriert sein.
+app.get(
+  '/weather-alerts/:houseId',
+  asyncRoute(async (req, res) => {
+    const houseId = req.params.houseId;
+    let house;
+    // Nutze Supabase wenn verfügbar, sonst In-Memory
+    if (supabase) {
+      house = await fetchHouseById(houseId);
+    } else {
+      house = houses.find((h) => h.id === houseId);
+    }
+    if (!house) {
+      return res.status(404).json({ alerts: [] });
+    }
+    // Stelle sicher, dass Koordinaten vorhanden sind
+    const lat = house.lat;
+    const lon = house.lng || house.lon;
+    if (!lat || !lon) {
+      return res.json({ alerts: [] });
+    }
+    try {
+      const url = `https://api.brightsky.dev/alerts?lat=${lat}&lon=${lon}&tz=Europe/Berlin`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error('🔴 BrightSky responded with status:', response.status);
+        return res.status(502).json({ alerts: [] });
+      }
+      const data = await response.json();
+      const alerts = data.alerts || [];
+      res.json({ alerts });
+    } catch (error) {
+      console.error('🔴 Error fetching weather alerts:', error);
+      res.status(500).json({ alerts: [] });
+    }
   })
 );
 
