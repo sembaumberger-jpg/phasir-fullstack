@@ -7,6 +7,7 @@ import { v4 as uuid } from 'uuid';
 import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
 import bcrypt from 'bcryptjs'; // 🔐 Passwort-Hashing
+import fs from 'fs'; // 📁 File persistence for in-memory fallback
 
 const PORT = process.env.PORT || 4000;
 const app = express();
@@ -71,11 +72,8 @@ if (!openai) {
   console.log('✅ OpenAI erfolgreich geladen.');
 }
 
-// In-Memory Demo-Daten (Fallback, falls Supabase nicht konfiguriert ist)
-// In‑Memory Demo-Daten (Fallback, falls Supabase nicht konfiguriert ist)
-// Die Demo‑Häuser enthalten jetzt auch grobe Koordinaten (lat/lng),
-// damit Wetterwarnungen über den Bright‑Sky‑Endpoint abgerufen werden können.
-const houses = [
+// In‑Memory Demo‑Daten (werden verwendet, wenn Supabase nicht konfiguriert ist und kein houses.json vorhanden ist)
+const demoHouses = [
   {
     id: uuid(),
     ownerName: 'Lisa Rhein',
@@ -127,6 +125,54 @@ const houses = [
   },
 ];
 
+// ⚠️ houses.json Persistence: falls Supabase nicht genutzt wird, versuchen wir, Häuser aus einer JSON-Datei zu laden.
+const housesFilePath = './data/houses.json';
+
+// Stelle sicher, dass der Datenordner existiert, damit writeFileSync nicht fehlschlägt
+if (!fs.existsSync('./data')) {
+  try {
+    fs.mkdirSync('./data');
+  } catch (e) {
+    console.warn('⚠️ Konnte Datenordner nicht erstellen:', e);
+  }
+}
+
+let houses;
+
+try {
+  const fileData = fs.readFileSync(housesFilePath, 'utf8');
+  const parsed = JSON.parse(fileData);
+  // Konvertiere Datumsstrings zurück in Date-Objekte
+  houses = parsed.map((h) => ({
+    ...h,
+    lastHeatingService: h.lastHeatingService ? new Date(h.lastHeatingService) : null,
+    lastRoofCheck: h.lastRoofCheck ? new Date(h.lastRoofCheck) : null,
+    lastSmokeCheck: h.lastSmokeCheck ? new Date(h.lastSmokeCheck) : null,
+  }));
+  console.log(`✅ Loaded ${houses.length} houses from persistence file`);
+} catch (err) {
+  // Wenn Datei fehlt oder Fehler beim Parsen → Demo-Daten verwenden
+  houses = demoHouses;
+  console.log('ℹ️ No houses.json found or failed to parse. Using demo houses.');
+}
+
+// Helper zum Speichern der Houses-Liste auf die Festplatte (nur wenn kein Supabase genutzt wird)
+function saveHousesToFile() {
+  try {
+    const replacer = (key, value) => {
+      // Speichere Date-Objekte als ISO-Strings
+      if (value instanceof Date) {
+        return value.toISOString();
+      }
+      return value;
+    };
+    fs.writeFileSync(housesFilePath, JSON.stringify(houses, replacer, 2));
+    console.log('💾 Houses saved to persistence file');
+  } catch (e) {
+    console.error('🔴 Failed to write houses.json:', e);
+  }
+}
+
 // 🧑‍💻 In-Memory-User (für Entwicklung)
 // Achtung: wird bei jedem Server-Neustart zurückgesetzt.
 // Passwort für Demo-User: "test1234"
@@ -138,6 +184,24 @@ const users = [
     createdAt: new Date().toISOString(),
   },
 ];
+
+// 🗝️ Sessions: ordnen Tokens den Benutzer-IDs zu.
+// Nach dem Login/Registrieren wird hier ein Eintrag abgelegt, damit wir den
+// Benutzer anhand des "Authorization: Bearer <token>" Headers identifizieren können.
+const sessions = [];
+
+// 🔐 Authentication-Middleware: liest den Bearer-Token aus dem Header aus und setzt req.userId
+app.use((req, _res, next) => {
+  const auth = req.headers.authorization || req.headers.Authorization;
+  if (auth && typeof auth === 'string' && auth.startsWith('Bearer ')) {
+    const token = auth.replace(/^Bearer\s+/, '');
+    const session = sessions.find((s) => s.token === token);
+    if (session) {
+      req.userId = session.userId;
+    }
+  }
+  next();
+});
 
 // 👉 Mapping: Supabase-Row -> internes House-Objekt (camelCase)
 const fromSupabaseRow = (row) => ({
@@ -1027,7 +1091,9 @@ app.get('/health', (_req, res) => {
 app.get(
   '/houses',
   asyncRoute(async (req, res) => {
-    const ownerId = req.query.ownerId || null;
+    // Nutze vorrangig die userId aus dem Bearer-Token, falls vorhanden.
+    // Falls kein Token gesetzt ist, kann ownerId als Query-Parameter übergeben werden (z.B. für Admins).
+    const ownerId = req.userId || req.query.ownerId || null;
     const result = await fetchAllHouses(ownerId);
     res.json(result.map(serializeHouse));
   })
@@ -1046,25 +1112,38 @@ app.get(
 app.post(
   '/houses',
   asyncRoute(async (req, res) => {
+    // nur angemeldete Nutzer dürfen neue Häuser anlegen
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Nicht authentifiziert.' });
+    }
+
+    // Basis-Felder, die zwingend vorhanden sein müssen
     const required = [
       'name',
       'address',
       'buildYear',
       'heatingType',
       'heatingInstallYear',
-      'lastHeatingService',
       'roofInstallYear',
       'windowInstallYear',
-      'lastSmokeCheck',
     ];
-    const missing = required.filter((key) => !req.body?.[key]);
+    const missing = required.filter((key) => req.body?.[key] === undefined || req.body?.[key] === null || req.body?.[key] === '');
     if (missing.length) {
-      return res.status(400).json({
-        error: `Missing fields: ${missing.join(', ')}`,
-      });
+      return res.status(400).json({ error: `Missing fields: ${missing.join(', ')}` });
     }
 
-    const house = await createHouse(req.body);
+    // Setze den Besitzer des Hauses immer anhand des eingeloggten Nutzers. Dadurch wird ownerId
+    // konsistent vergeben und kann später zum Filtern benutzt werden. Eingehende ownerId wird ignoriert.
+    const payload = { ...req.body, ownerId: userId };
+
+    const house = await createHouse(payload);
+
+    // Persistiere ins Dateisystem, falls kein Supabase vorhanden ist
+    if (!supabase) {
+      saveHousesToFile();
+    }
+
     res.status(201).json(serializeHouse(house));
   })
 );
@@ -1072,9 +1151,27 @@ app.post(
 app.put(
   '/houses/:id',
   asyncRoute(async (req, res) => {
-    const house = await updateHouseById(req.params.id, req.body);
-    if (!house)
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Nicht authentifiziert.' });
+    }
+    const existing = await fetchHouseById(req.params.id);
+    if (!existing) {
       return res.status(404).json({ error: 'House not found' });
+    }
+    // Verhindere, dass ein Nutzer ein Haus aktualisiert, das ihm nicht gehört
+    if (existing.ownerId && existing.ownerId !== userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    // Setze ownerId immer auf den eingeloggten Nutzer, damit die Zuordnung konsistent bleibt
+    const payload = { ...req.body, ownerId: userId };
+    const house = await updateHouseById(req.params.id, payload);
+    if (!house) {
+      return res.status(404).json({ error: 'House not found' });
+    }
+    if (!supabase) {
+      saveHousesToFile();
+    }
     res.json(serializeHouse(house));
   })
 );
@@ -1557,6 +1654,8 @@ app.post(
     users.push(newUser);
 
     const token = `sess-${uuid()}`;
+    // Lege eine neue Session ab, damit der Token später dem User zugeordnet werden kann
+    sessions.push({ token, userId: newUser.id });
 
     res.status(201).json({
       token,
@@ -1604,6 +1703,8 @@ app.post(
     }
 
     const token = `sess-${uuid()}`;
+    // Lege eine neue Session ab, damit der Token später dem User zugeordnet werden kann
+    sessions.push({ token, userId: user.id });
 
     res.json({
       token,

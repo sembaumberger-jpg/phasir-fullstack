@@ -56,7 +56,6 @@ final class HouseListViewModel: ObservableObject {
         await service.updateHouse(houseId: houseId, request: request)
 
         // Danach den aktuellen Zustand aus dem Service übernehmen
-        // (statt irgendwo im UI manuell Indexe zu manipulieren)
         syncFromService()
 
         return service.errorMessage == nil
@@ -79,8 +78,6 @@ final class HouseListViewModel: ObservableObject {
     func loadEnergyAdvice(for houseId: String) async {
         await service.fetchEnergyAdvice(for: houseId)
         errorMessage = service.errorMessage
-
-        // energyAdviceByHouseId liegt im Service → manuell UI-Update anstoßen
         objectWillChange.send()
     }
 
@@ -95,8 +92,6 @@ final class HouseListViewModel: ObservableObject {
     func loadFinanceAdvice(for houseId: String) async {
         await service.fetchFinanceAdvice(for: houseId)
         errorMessage = service.errorMessage
-
-        // Finance-Daten liegen im Service → UI-Update anstoßen
         objectWillChange.send()
     }
 
@@ -113,8 +108,6 @@ final class HouseListViewModel: ObservableObject {
 
         await service.fetchRentBenchmark()
         errorMessage = service.errorMessage
-
-        // Benchmark-Daten liegen im Service → UI-Update anstoßen
         objectWillChange.send()
     }
 
@@ -137,8 +130,6 @@ final class HouseListViewModel: ObservableObject {
             systemType: systemType
         )
         errorMessage = service.errorMessage
-
-        // Repair-Daten liegen im Service → UI-Update
         objectWillChange.send()
     }
 

@@ -5,9 +5,29 @@ struct MainTabView: View {
     @StateObject private var houseListViewModel: HouseListViewModel
     private let houseService: HouseService
 
-    init(sessionManager: SessionManager, houseService: HouseService) {
+    // Haupt-Init: wird in der echten App von ContentView verwendet
+    init(sessionManager: SessionManager) {
         self.sessionManager = sessionManager
+
+        let baseURL = URL(string: "https://phasir-fullstack-production.up.railway.app")!
+        let houseService = HouseService(baseURL: baseURL)
         self.houseService = houseService
+
+        _houseListViewModel = StateObject(
+            wrappedValue: HouseListViewModel(service: houseService)
+        )
+    }
+
+    // Convenience-Init: für Previews / Canvas: `MainTabView()`
+    init() {
+        let baseURL = URL(string: "https://phasir-fullstack-production.up.railway.app")!
+        let houseService = HouseService(baseURL: baseURL)
+        self.houseService = houseService
+
+        let apiClient = ApiClient(baseURL: baseURL)
+        let sessionManager = SessionManager(apiClient: apiClient, houseService: houseService)
+
+        self.sessionManager = sessionManager
         _houseListViewModel = StateObject(
             wrappedValue: HouseListViewModel(service: houseService)
         )
@@ -15,15 +35,18 @@ struct MainTabView: View {
 
     var body: some View {
         TabView {
-            // HOME: Aktionen + News
+            // HOME
             NavigationStack {
-                HomeView(viewModel: houseListViewModel)
+                HomeView(
+                    viewModel: houseListViewModel,
+                    houseService: houseService
+                )
             }
             .tabItem {
                 Label("Home", systemImage: "house.fill")
             }
 
-            // OBJEKTE: nur Immobilien-Liste
+            // OBJEKTE
             NavigationStack {
                 HouseListView(viewModel: houseListViewModel)
             }
@@ -39,9 +62,9 @@ struct MainTabView: View {
                 Label("Insights", systemImage: "chart.bar.xaxis")
             }
 
-            // 🔮 SOLVER: Neuer Tab für den Problem‑Solver
+            // SOLVER
             NavigationStack {
-                ProblemSolverTabView(viewModel: houseListViewModel, houseService: houseService)
+                ProblemSolverTabView(viewModel: houseListViewModel)
             }
             .tabItem {
                 Label("Solver", systemImage: "wand.and.stars")
