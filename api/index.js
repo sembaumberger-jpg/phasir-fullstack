@@ -7,6 +7,8 @@ import { v4 as uuid } from 'uuid';
 import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
 import bcrypt from 'bcryptjs'; // 🔐 Passwort-Hashing
+import jwt from 'jsonwebtoken';
+
 
 const PORT = process.env.PORT || 4000;
 const app = express();
@@ -29,6 +31,10 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase =
   supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 const SUPABASE_TABLE = 'houses';
+const USER_TABLE = process.env.SUPABASE_USER_TABLE || 'phasir_users';
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+const TOKEN_EXPIRES_IN = '30d';
+
 
 app.use(cors());
 app.use(express.json());
@@ -38,6 +44,82 @@ const intervals = {
   roof: 4,
   windows: 15,
   smoke: 1,
+};
+
+// 🧑‍💻 User-Management (Supabase + Fallback)
+
+const fallbackUsers = [];
+
+const mapUserRowFromSupabase = (row) => ({
+  id: row.id,
+  email: row.email,
+  passwordHash: row.passwordhash,
+  createdAt: row.createdat,
+});
+
+const findUserByEmail = async (email) => {
+  const normalized = String(email).trim().toLowerCase();
+
+  if (!supabase) {
+    return fallbackUsers.find((u) => u.email === normalized) || null;
+  }
+
+  const { data, error } = await supabase
+    .from(USER_TABLE)
+    .select('*')
+    .eq('email', normalized)
+    .limit(1);
+
+  if (error) {
+    console.error('❌ Supabase findUserByEmail failed:', error);
+    throw new Error('Database error');
+  }
+
+  if (!data || data.length === 0) return null;
+  return mapUserRowFromSupabase(data[0]);
+};
+
+const createUser = async ({ email, passwordHash }) => {
+  const normalized = String(email).trim().toLowerCase();
+
+  if (!supabase) {
+    const user = {
+      id: uuid(),
+      email: normalized,
+      passwordHash,
+      createdAt: new Date().toISOString(),
+    };
+    fallbackUsers.push(user);
+    return user;
+  }
+
+  const insertPayload = {
+    id: uuid(),
+    email: normalized,
+    passwordhash: passwordHash,
+    createdat: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from(USER_TABLE)
+    .insert(insertPayload)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ Supabase createUser failed:', error);
+    throw new Error('Database error');
+  }
+
+  return mapUserRowFromSupabase(data);
+};
+
+const createSessionToken = (user) => {
+  return jwt.sign(
+    { userId: user.id },
+    JWT_SECRET,
+    { expiresIn: TOKEN_EXPIRES_IN }
+  );
 };
 
 // 🆕 ---- News API Setup (für Immobilien-News) ----
@@ -115,19 +197,7 @@ const houses = [
     windowInstallYear: 2017,
     lastSmokeCheck: new Date('2024-04-09'),
   },
-];
-
-// 🧑‍💻 In-Memory-User (für Entwicklung)
-// Achtung: wird bei jedem Server-Neustart zurückgesetzt.
-// Passwort für Demo-User: "test1234"
-const users = [
-  {
-    id: uuid(),
-    email: 'demo@phasir.app',
-    passwordHash: bcrypt.hashSync('test1234', 10),
-    createdAt: new Date().toISOString(),
-  },
-];
+]; 
 
 // 👉 Mapping: Supabase-Row -> internes House-Objekt (camelCase)
 const fromSupabaseRow = (row) => ({
@@ -1453,97 +1523,84 @@ app.post(
     const { email, password } = req.body || {};
 
     if (!email || !password) {
-      res.status(400).json({
-        error: 'E-Mail und Passwort sind erforderlich.',
+      return res.status(400).json({
+
+        error: 'E-Mail und Passwort werden benötigt.',
       });
-      return;
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
 
-    // existiert schon?
-    const existing = users.find((u) => u.email === normalizedEmail);
-    if (existing) {
-      res.status(409).json({
-        error: 'Für diese E-Mail existiert bereits ein Konto.',
+    const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({
+        error: 'Bitte gib eine gültige E-Mail-Adresse ein.',
       });
-      return;
     }
 
     if (password.length < 8) {
-      res.status(400).json({
+      return res.status(400).json({
         error: 'Passwort muss mindestens 8 Zeichen haben.',
       });
-      return;
+    }
+
+    const existing = await findUserByEmail(normalizedEmail);
+    if (existing) {
+      return res.status(409).json({
+        error: 'Für diese E-Mail existiert bereits ein Konto.',
+      });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const user = await createUser({ email: normalizedEmail, passwordHash });
 
-    const newUser = {
-      id: uuid(),
-      email: normalizedEmail,
-      passwordHash,
-      createdAt: new Date().toISOString(),
-    };
+    const token = createSessionToken(user);
 
-    users.push(newUser);
-
-    const token = `sess-${uuid()}`;
-
-    res.status(201).json({
-      token,
-      userId: newUser.id,
-      email: newUser.email,
-    });
-  })
-);
-
-// Login
-app.post(
-  '/auth/login',
-  asyncRoute(async (req, res) => {
-    const { email, password } = req.body || {};
-
-    if (!email || !password) {
-      res.status(400).json({
-        error: 'E-Mail und Passwort sind erforderlich.',
-      });
-      return;
-    }
-
-    const normalizedEmail = String(email).trim().toLowerCase();
-    const user = users.find((u) => u.email === normalizedEmail);
-
-    if (!user) {
-      // kein User mit dieser Mail
-      res.status(401).json({
-        error:
-          'Diese Kombination aus E-Mail und Passwort ist nicht gültig.',
-      });
-      return;
-    }
-
-    const isValid = await bcrypt.compare(
-      password,
-      user.passwordHash
-    );
-    if (!isValid) {
-      res.status(401).json({
-        error:
-          'Diese Kombination aus E-Mail und Passwort ist nicht gültig.',
-      });
-      return;
-    }
-
-    const token = `sess-${uuid()}`;
-
-    res.json({
+    return res.status(201).json({
       token,
       userId: user.id,
       email: user.email,
     });
   })
 );
+
+app.post(
+  '/auth/login',
+  asyncRoute(async (req, res) => {
+    const { email, password } = req.body || {};
+
+    if (!email || !password) {
+      return res.status(400).json({
+        error: 'E-Mail und Passwort werden benötigt.',
+      });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const user = await findUserByEmail(normalizedEmail);
+
+    if (!user) {
+      return res.status(401).json({
+        error: 'Diese Kombination aus E-Mail und Passwort ist nicht gültig.',
+      });
+    }
+
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) {
+      return res.status(401).json({
+        error: 'Diese Kombination aus E-Mail und Passwort ist nicht gültig.',
+      });
+    }
+
+    const token = createSessionToken(user);
+
+    return res.json({
+      token,
+      userId: user.id,
+      email: user.email,
+    });
+  })
+);
+
 
 // 🆕 ---------- REAL ESTATE NEWS ENDPOINT (mit fetch) ----------
 
