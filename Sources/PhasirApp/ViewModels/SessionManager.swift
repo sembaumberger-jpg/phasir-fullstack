@@ -15,6 +15,14 @@ final class SessionManager: ObservableObject {
         self.houseService = houseService
     }
 
+    /// Gemeinsamen HouseService nach außen geben,
+    /// damit MainTabView exakt denselben Service verwendet.
+    func getHouseService() -> HouseService {
+        houseService
+    }
+
+    // MARK: - Auth
+
     /// Login gegen das Backend
     func login(email: String, password: String) async throws {
         isLoading = true
@@ -24,6 +32,7 @@ final class SessionManager: ObservableObject {
             let session = try await apiClient.login(email: email, password: password)
 
             self.session = session
+            // ⬅️ WICHTIG: HouseService bekommt Token + userId
             houseService.updateAuth(session: session)
             isAuthenticated = true
         } catch {
@@ -53,6 +62,7 @@ final class SessionManager: ObservableObject {
             let session = try await apiClient.register(email: email, password: password)
 
             self.session = session
+            // ⬅️ Auch hier: HouseService bekommt Token + userId
             houseService.updateAuth(session: session)
             isAuthenticated = true
         } catch {

@@ -3,9 +3,9 @@ import SwiftUI
 struct HomeView: View {
     /// ViewModel für die Hausliste und allgemeine Daten
     @ObservedObject var viewModel: HouseListViewModel
-    /// Service zum Laden weiterer Daten wie z.B. das Problem‑Radar
+    /// Service zum Laden weiterer Daten wie z.B. das Problem-Radar
     private let houseService: HouseService
-    /// ViewModel für das Problem‑Radar, das innerhalb des Home‑Tabs angezeigt wird
+    /// ViewModel für das Problem-Radar, das innerhalb des Home-Tabs angezeigt wird
     @StateObject private var radarViewModel: ProblemRadarViewModel
 
     @State private var selectedTab: HomeTab = .actions
@@ -15,12 +15,18 @@ struct HomeView: View {
         case news
     }
 
-    /// Initializer, der sowohl den bestehenden HouseListViewModel als auch den HouseService entgegennimmt.
-    /// Beim Erstellen des HomeViews wird zusätzlich ein ProblemRadarViewModel erzeugt.
-    init(viewModel: HouseListViewModel, houseService: HouseService) {
-        self.viewModel = viewModel
+    /// Initializer, der den bestehenden HouseListViewModel entgegennimmt.
+    /// Der HouseService wird intern aufgebaut und für das ProblemRadarViewModel genutzt.
+    init(viewModel: HouseListViewModel) {
+        self._viewModel = ObservedObject(wrappedValue: viewModel)
+
+        let baseURL = URL(string: "https://phasir-fullstack-production.up.railway.app")!
+        let houseService = HouseService(baseURL: baseURL)
         self.houseService = houseService
-        _radarViewModel = StateObject(wrappedValue: ProblemRadarViewModel(houseService: houseService))
+
+        _radarViewModel = StateObject(
+            wrappedValue: ProblemRadarViewModel(houseService: houseService)
+        )
     }
 
     var body: some View {
@@ -112,7 +118,7 @@ struct HomeView: View {
                         Text("Aktuell keine dringenden Aktionen")
                             .font(.system(size: 17, weight: .semibold))
 
-                        Text("Sobald Wartungen anstehen, Mieten stark vom Markt abweichen oder Objekte negativ laufen, erscheinen sie hier als To‑dos.")
+                        Text("Sobald Wartungen anstehen, Mieten stark vom Markt abweichen oder Objekte negativ laufen, erscheinen sie hier als To-dos.")
                             .font(.system(size: 13))
                             .foregroundColor(.phasirSecondaryText)
                             .multilineTextAlignment(.center)
@@ -141,7 +147,7 @@ struct HomeView: View {
                     .padding(.bottom, 24)
                 }
 
-                // ----- Problem‑Radar: prognostizierte Probleme -----
+                // ----- Problem-Radar: prognostizierte Probleme -----
                 radarSection
             }
         }
@@ -244,13 +250,13 @@ struct HomeView: View {
         .foregroundColor(Color.primary)
     }
 
-    // MARK: - Problem‑Radar Section
+    // MARK: - Problem-Radar Section
 
     /// Zusammenfassung aller prognostizierten Probleme in einem separaten Abschnitt unterhalb des Action Centers.
     /// Zeigt einen Titel, eine optionale Ladeanzeige, einen leeren Hinweis oder für jedes Haus eine Liste von Issues.
     private var radarSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Problem‑Radar")
+            Text("Problem-Radar")
                 .font(.system(size: 18, weight: .semibold))
                 .padding(.horizontal, PhasirDesign.screenPadding)
                 .padding(.top, 8)
@@ -320,7 +326,7 @@ struct HomeView: View {
         }
     }
 
-    /// Aggregiert alle Issues aus dem Problem‑Radar, um schnell zu prüfen, ob welche vorhanden sind.
+    /// Aggregiert alle Issues aus dem Problem-Radar, um schnell zu prüfen, ob welche vorhanden sind.
     private var radarIssues: [ProblemPrediction] {
         radarViewModel.houses.flatMap { $0.issues }
     }
@@ -334,7 +340,7 @@ struct HomeView: View {
         }
     }
 
-    /// Konvertiert die englische Severity‑Angabe aus dem Backend in eine deutschsprachige Beschriftung
+    /// Konvertiert die englische Severity-Angabe aus dem Backend in eine deutschsprachige Beschriftung
     private func severityLabel(for severity: String) -> String {
         switch severity.lowercased() {
         case "high": return "Hoch"

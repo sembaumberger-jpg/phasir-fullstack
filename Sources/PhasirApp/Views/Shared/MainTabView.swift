@@ -3,27 +3,24 @@ import SwiftUI
 struct MainTabView: View {
     @ObservedObject var sessionManager: SessionManager
     @StateObject private var houseListViewModel: HouseListViewModel
-    private let houseService: HouseService
 
-    // Haupt-Init: wird in der echten App von ContentView verwendet
+    // Haupt-Init: wird in der echten App von ContentView/PhasirApp verwendet
     init(sessionManager: SessionManager) {
         self.sessionManager = sessionManager
 
-        let baseURL = URL(string: "https://phasir-fullstack-production.up.railway.app")!
-        let houseService = HouseService(baseURL: baseURL)
-        self.houseService = houseService
+        // Wir holen den gleichen HouseService,
+        // den der SessionManager beim Login mit Auth-Daten füttert.
+        let sharedHouseService = sessionManager.getHouseService()
 
         _houseListViewModel = StateObject(
-            wrappedValue: HouseListViewModel(service: houseService)
+            wrappedValue: HouseListViewModel(service: sharedHouseService)
         )
     }
 
-    // Convenience-Init: für Previews / Canvas: `MainTabView()`
+    // Convenience-Init: nur für Previews / Canvas
     init() {
         let baseURL = URL(string: "https://phasir-fullstack-production.up.railway.app")!
         let houseService = HouseService(baseURL: baseURL)
-        self.houseService = houseService
-
         let apiClient = ApiClient(baseURL: baseURL)
         let sessionManager = SessionManager(apiClient: apiClient, houseService: houseService)
 
@@ -35,51 +32,30 @@ struct MainTabView: View {
 
     var body: some View {
         TabView {
-            // HOME
-            NavigationStack {
-                HomeView(
-                    viewModel: houseListViewModel,
-                    houseService: houseService
-                )
-            }
-            .tabItem {
-                Label("Home", systemImage: "house.fill")
-            }
+            HomeView(viewModel: houseListViewModel)
+                .tabItem {
+                    Label("Home", systemImage: "house.fill")
+                }
 
-            // OBJEKTE
-            NavigationStack {
-                HouseListView(viewModel: houseListViewModel)
-            }
-            .tabItem {
-                Label("Objekte", systemImage: "building.2.fill")
-            }
+            HouseListView(viewModel: houseListViewModel)
+                .tabItem {
+                    Label("Objekte", systemImage: "building.2.fill")
+                }
 
-            // INSIGHTS
-            NavigationStack {
-                InsightsView(viewModel: houseListViewModel)
-            }
-            .tabItem {
-                Label("Insights", systemImage: "chart.bar.xaxis")
-            }
+            InsightsView(viewModel: houseListViewModel)
+                .tabItem {
+                    Label("Insights", systemImage: "chart.bar.fill")
+                }
 
-            // SOLVER
-            NavigationStack {
-                ProblemSolverTabView(viewModel: houseListViewModel)
-            }
-            .tabItem {
-                Label("Solver", systemImage: "wand.and.stars")
-            }
+            ProblemSolverTabView(viewModel: houseListViewModel)
+                .tabItem {
+                    Label("Solver", systemImage: "wrench.and.screwdriver.fill")
+                }
 
-            // PROFIL
-            NavigationStack {
-                ProfileView(sessionManager: sessionManager)
-            }
-            .tabItem {
-                Label("Profil", systemImage: "person.fill")
-            }
+            ProfileView(sessionManager: sessionManager)
+                .tabItem {
+                    Label("Profil", systemImage: "person.crop.circle")
+                }
         }
-        .tint(Color.phasirAccent)
-        .background(Color.phasirBackground.ignoresSafeArea())
-        .preferredColorScheme(.light)
     }
 }
