@@ -568,22 +568,26 @@ const parseHousePayload = (payload = {}) => {
 // ---------- DB-Funktionen ----------
 
 const fetchAllHouses = async (ownerId) => {
+  // 🔒 Sicherheitsnetz: ohne ownerId NIE Häuser zurückgeben, damit
+  // kein User versehentlich alle Objekte sieht.
+  if (!ownerId) {
+    console.log('⚠️ fetchAllHouses ohne ownerId aufgerufen – gebe leere Liste zurück');
+    return [];
+  }
+
   if (!supabase) {
     console.log('⚙️ Using in-memory houses, ownerId filter =', ownerId);
-    let result = houses;
-    if (ownerId) {
-      result = houses.filter((h) => h.ownerId === ownerId);
-    }
+    const result = houses.filter((h) => h.ownerId === ownerId);
     return result.map(normalizeHouse);
   }
 
   console.log('🗄️ Using Supabase, ownerId filter =', ownerId);
-  let query = supabase.from(SUPABASE_TABLE).select('*');
-  if (ownerId) {
-    query = query.eq('ownerid', ownerId);
-  }
 
-  const { data, error } = await query;
+  const { data, error } = await supabase
+    .from(SUPABASE_TABLE)
+    .select('*')
+    .eq('ownerid', ownerId);
+
   if (error) {
     console.error('🔴 Supabase fetchAllHouses failed:', error);
     throw new Error(`Supabase fetchAllHouses failed: ${error.message}`);
@@ -591,6 +595,7 @@ const fetchAllHouses = async (ownerId) => {
 
   return data.map(fromSupabaseRow).map(normalizeHouse);
 };
+
 
 const fetchHouseById = async (id) => {
   if (!supabase) return houses.find((h) => h.id === id) ?? null;
@@ -706,15 +711,27 @@ app.get(
   })
 );
 
-// Haus erstellen – ohne Pflichtfeld-Blockade
 app.post(
   '/houses',
   asyncRoute(async (req, res) => {
     const payload = req.body || {};
+
+    // parseHousePayload kümmert sich um sinnvolle Defaults:
+    // - name: "Neue Immobilie" falls leer
+    // - buildYear usw. -> aktuelles Jahr
+    // - ownerId: kommt aus payload.ownerId (die App setzt das auf currentUserId)
+
     const house = await createHouse(payload);
+
+    // Persistiere ins Dateisystem, wenn kein Supabase verwendet wird
+    if (!supabase) {
+      saveHousesToFile();
+    }
+
     res.status(201).json(serializeHouse(house));
   })
 );
+
 
 // Haus aktualisieren
 app.put(
