@@ -8,6 +8,8 @@ struct HouseDetailView: View {
 
     @State private var isLoadingEnergyAdvice = false
     @State private var isShowingEdit = false
+    /// Steuert die Navigation zur Nebenkosten‑Abrechnung.
+    @State private var isShowingCostBilling = false
 
     var body: some View {
         ZStack {
@@ -30,6 +32,14 @@ struct HouseDetailView: View {
                         await viewModel.updateHouse(houseId: house.id, request: request)
                     }
                 )
+            } label: {
+                EmptyView()
+            }
+            .hidden()
+
+            // Navigation zur Nebenkosten-Abrechnung
+            NavigationLink(isActive: $isShowingCostBilling) {
+                OperatingCostBillingView(viewModel: OperatingCostBillingViewModel(house: house))
             } label: {
                 EmptyView()
             }
@@ -766,14 +776,43 @@ struct HouseDetailView: View {
                 }
             }
 
+            // Button zur Nebenkosten-Abrechnung
+            Button {
+                isShowingCostBilling = true
+            } label: {
+                HStack {
+                    Image(systemName: "chart.pie.fill")
+                        .foregroundColor(Color.phasirAccent)
+                    Text("Nebenkosten abrechnen")
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color.phasirAccent)
+                }
+                .padding(.vertical, 10)
+                .padding(.horizontal, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.phasirAccent.opacity(0.08))
+                )
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 8)
+
+            // Button zum Bearbeiten
             Button {
                 isShowingEdit = true
             } label: {
                 HStack {
                     Image(systemName: "pencil")
+                        .foregroundColor(Color.phasirAccent)
                     Text("Bearbeiten")
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                     Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color.phasirAccent)
                 }
                 .padding(.vertical, 10)
                 .padding(.horizontal, 12)

@@ -687,6 +687,247 @@ Regeln:
   };
 }
 
+// ---------- INVESTMENT-KI (Wertsteigerung + Energie) ----------
+
+/**
+ * Heuristische Vorschläge, wie der Eigentümer durch energetische Maßnahmen
+ * den Wert der Immobilie und die laufenden Kosten verbessern kann.
+ *
+ * Nutzt Felder aus deinem House-Modell:
+ *  - purchasePrice
+ *  - livingArea
+ *  - estimatedAnnualEnergyConsumption
+ *  - hasSolarPanels
+ *  - energyCertificateClass
+ */
+const computeInvestmentAdvice = (house = {}) => {
+  const suggestions = [];
+
+  const purchasePrice = Number(house.purchasePrice || 0);
+  const livingArea = Number(house.livingArea || 0);
+  const consumption = Number(house.estimatedAnnualEnergyConsumption || 0);
+
+  const hasSolar =
+    house.hasSolarPanels === true ||
+    house.hassolarpanels === true;
+
+  const energyClassRaw =
+    house.energyCertificateClass ||
+    house.energycertificateclass ||
+    '';
+  const energyClass = String(energyClassRaw).toUpperCase().trim();
+
+  const isVeryBadClass = ['F', 'G', 'H'].includes(energyClass);
+  const isBelowAverageClass = ['D', 'E'].includes(energyClass);
+
+  // Wie "schlecht" die Immobilie energetisch ist -> wie hoch das Potenzial
+  const baseUpgradeFactor = isVeryBadClass
+    ? 0.18 // sehr schlechtes Niveau → großes Potenzial
+    : isBelowAverageClass
+    ? 0.10
+    : 0.05;
+
+  // Hilfsfunktion für ROI-Berechnung
+  const buildSuggestion = ({
+    name,
+    description,
+    type,
+    cost,
+    valueIncrease,
+    annualSavings,
+  }) => {
+    const paybackYears =
+      annualSavings > 0 ? Number((cost / annualSavings).toFixed(1)) : null;
+    const roi10Y =
+      cost > 0
+        ? Number(
+            (((valueIncrease + annualSavings * 10) - cost) / cost).toFixed(2)
+          )
+        : null;
+
+    return {
+      name,
+      description,
+      type,
+      cost: Math.round(cost),
+      estimatedValueIncrease: Math.round(valueIncrease),
+      estimatedAnnualSavings: Math.round(annualSavings),
+      paybackYears,
+      roi10Y,
+    };
+  };
+
+  // 1) PV-Anlage + Dachoptimierung (nur wenn noch keine PV)
+  if (!hasSolar && purchasePrice > 0) {
+    const cost = 18000 + Math.max(0, livingArea - 100) * 80;
+    const valueIncrease = purchasePrice * (baseUpgradeFactor * 0.6);
+    const annualSavings =
+      consumption > 0 ? Math.min(consumption * 0.25 * 0.35, 2000) : 800;
+
+    suggestions.push(
+      buildSuggestion({
+        name: 'PV-Anlage + Dachoptimierung',
+        description:
+          'Steigert den Verkaufswert deutlich und reduziert langfristig Stromkosten – ideal bei geeigneter Dachfläche.',
+        type: 'energy + value',
+        cost,
+        valueIncrease,
+        annualSavings,
+      })
+    );
+  }
+
+  // 2) Fassadendämmung + Fenster
+  if (purchasePrice > 0 && (isVeryBadClass || isBelowAverageClass)) {
+    const cost = 25000 + Math.max(0, livingArea - 120) * 120;
+    const valueIncrease = purchasePrice * (baseUpgradeFactor * 0.7);
+    const annualSavings =
+      consumption > 0 ? Math.min(consumption * 0.3 * 0.3, 2500) : 1200;
+
+    suggestions.push(
+      buildSuggestion({
+        name: 'Fassadendämmung + Fensterpaket',
+        description:
+          'Großer Sprung im Energieausweis (z. B. von E/F nach C/B). Besonders relevant für Banken, Käufer und Mieter.',
+        type: 'energy',
+        cost,
+        valueIncrease,
+        annualSavings,
+      })
+    );
+  }
+
+  // 3) Heizungsmodernisierung / Wärmepumpe
+  if (purchasePrice > 0) {
+    const cost = 18000 + (livingArea > 140 ? 4000 : 0);
+    const valueIncrease = purchasePrice * (baseUpgradeFactor * 0.4);
+    const annualSavings =
+      consumption > 0 ? Math.min(consumption * 0.22 * 0.35, 1800) : 900;
+
+    suggestions.push(
+      buildSuggestion({
+        name: 'Heizungstausch / Wärmepumpe',
+        description:
+          'Reduziert Heizkosten, verbessert Energieklasse und macht die Immobilie zukunftsfähig (Heizgesetz).',
+        type: 'energy',
+        cost,
+        valueIncrease,
+        annualSavings,
+      })
+    );
+  }
+
+  // 4) Smart-Home + Sicherheit
+  const comfortCost = 3000 + (livingArea > 120 ? 2000 : 0);
+  const comfortValueIncrease = purchasePrice * 0.01;
+  const comfortSavings = 150; // z.B. bessere Heizungssteuerung
+
+  suggestions.push(
+    buildSuggestion({
+      name: 'Smart-Home + Sicherheitspaket',
+      description:
+        'Steigert Komfort, Sicherheit und Vermietbarkeit (z. B. smarte Thermostate, Video-Gegensprechanlage, smarte Türschlösser).',
+      type: 'comfort',
+      cost: comfortCost,
+      valueIncrease: comfortValueIncrease,
+      annualSavings: comfortSavings,
+    })
+  );
+
+  return suggestions;
+};
+
+/**
+ * Wenn OpenAI konfiguriert ist, generieren wir feiner granulierte Tipps,
+ * ansonsten nutzen wir computeInvestmentAdvice als Heuristik.
+ */
+async function generateInvestmentAdviceWithAI(house) {
+  if (!openai) {
+    return {
+      suggestions: computeInvestmentAdvice(house),
+      summary:
+        'Heuristische Vorschläge basierend auf Gebäude- und Energiedaten (PV, Dämmung, Heizung, Smart-Home).',
+    };
+  }
+
+  const systemPrompt =
+    'Du bist ein erfahrener Immobilien-Investment- und Energieberater in Deutschland. ' +
+    'Du analysierst Wohnimmobilien aus Investorensicht und schlägst Maßnahmen vor, ' +
+    'die sowohl den Verkehrswert als auch die laufenden Energie- und Betriebskosten verbessern. ' +
+    'Antworte ausschließlich im JSON-Format.';
+
+  const userPrompt = `
+Analysiere diese Immobilie und gib konkrete Investment-Vorschläge:
+
+Hausdaten (JSON):
+${JSON.stringify(house, null, 2)}
+
+Erstelle eine Antwort GENAU in diesem JSON-Format:
+
+{
+  "summary": "Kurze zusammenfassende Einschätzung in 1–3 Sätzen.",
+  "suggestions": [
+    {
+      "name": "PV-Anlage + Dachoptimierung",
+      "description": "Kurze Beschreibung, warum diese Maßnahme sinnvoll ist.",
+      "type": "energy" | "value" | "energy + value" | "comfort",
+      "cost": 22000,
+      "estimatedValueIncrease": 38000,
+      "estimatedAnnualSavings": 1600,
+      "paybackYears": 13.8,
+      "roi10Y": 1.2
+    }
+  ]
+}
+
+Regeln:
+- Schreibe auf Deutsch.
+- Nutze realistische, konservative Schätzungen.
+- Wenn du unsicher bist, schätze lieber vorsichtig und erkläre das in der Beschreibung.
+`;
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4.1-mini',
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+  });
+
+  const content = completion.choices[0]?.message?.content || '{}';
+
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch (err) {
+    console.error(
+      '🔴 Konnte AI-JSON für Investment Advice nicht parsen, fallback:',
+      err
+    );
+    return {
+      suggestions: computeInvestmentAdvice(house),
+      summary:
+        'Heuristische Vorschläge (Fallback), da die KI-Antwort nicht sauber geparst werden konnte.',
+    };
+  }
+
+  const fallbackSuggestions = computeInvestmentAdvice(house);
+  const suggestions =
+    Array.isArray(parsed.suggestions) && parsed.suggestions.length
+      ? parsed.suggestions
+      : fallbackSuggestions;
+
+  return {
+    summary:
+      typeof parsed.summary === 'string'
+        ? parsed.summary
+        : 'Heuristische Vorschläge basierend auf Gebäude- und Energiedaten.',
+    suggestions,
+  };
+}
+
+
 // ---------- PROBLEM-DIAGNOSE-KI ----------
 
 async function generateProblemAnalysisWithAI(house, description) {
@@ -1251,7 +1492,42 @@ app.post(
     }
   })
 );
+app.post(
+  '/ai/investment-advice',
+  asyncRoute(async (req, res) => {
+    const { houseId, house: rawHouse } = req.body || {};
 
+    let house = rawHouse || null;
+
+    // Variante A: Client sendet komplettes Haus-Objekt
+    if (!house && !houseId) {
+      return res.status(400).json({
+        error:
+          'houseId oder house muss im Body übergeben werden (z. B. { "houseId": "...uuid..." }).',
+      });
+    }
+
+    // Variante B: Haus aus DB holen
+    if (!house && houseId) {
+      house = await fetchHouseById(houseId);
+      if (!house) {
+        return res.status(404).json({ error: 'House not found' });
+      }
+    }
+
+    const result = await generateInvestmentAdviceWithAI(house);
+    const suggestions =
+      Array.isArray(result.suggestions) && result.suggestions.length
+        ? result.suggestions
+        : computeInvestmentAdvice(house);
+
+    res.json({
+      houseId: house.id || houseId || null,
+      summary: result.summary || null,
+      suggestions,
+    });
+  })
+);
 // Mietspiegel / Markt-Benchmark
 app.post(
   '/ai/rent-benchmark',

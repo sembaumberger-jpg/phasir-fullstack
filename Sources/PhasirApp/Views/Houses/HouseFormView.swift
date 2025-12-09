@@ -41,6 +41,14 @@ struct HouseFormView: View {
 
     @State private var isFinanceExpanded: Bool = false
 
+    // Neue UI-States für Nebenkosten / Struktur
+    @State private var unitCountText: String = ""
+    @State private var operatingCostAdvanceText: String = ""
+    @State private var lastOperatingCostYearText: String = ""
+    @State private var isCostExpanded: Bool = false
+
+    // Placeholder: Input style defined globally at bottom of file.
+
     private let heatingTypes = ["Gas", "Öl", "Wärmepumpe", "Fernwärme", "Solar", "Elektrisch"]
     private let usageTypes = [
         "Eigenbedarf",
@@ -104,6 +112,22 @@ struct HouseFormView: View {
             initial.interestRate = existing.interestRate
             initial.loanMonthlyPayment = existing.loanMonthlyPayment
 
+            // Nebenkosten & Struktur (falls vorhanden)
+            initial.billingModel = existing.billingModel
+            initial.unitCount = existing.unitCount
+            initial.hasCommercialUnit = existing.hasCommercialUnit
+            initial.primaryOperatingCostKey = existing.primaryOperatingCostKey
+            initial.hasCaretakerService = existing.hasCaretakerService
+            initial.hasGardenService = existing.hasGardenService
+            initial.hasElevator = existing.hasElevator
+            initial.hasCommonElectricity = existing.hasCommonElectricity
+            initial.hasGarageOrParking = existing.hasGarageOrParking
+            initial.hasHeatMeterPerUnit = existing.hasHeatMeterPerUnit
+            initial.hasWaterMeterPerUnit = existing.hasWaterMeterPerUnit
+            initial.operatingCostAdvanceTotalPerMonth = existing.operatingCostAdvanceTotalPerMonth
+            initial.lastOperatingCostYear = existing.lastOperatingCostYear
+            initial.operatingCostNotes = existing.operatingCostNotes
+
             _request = State(initialValue: initial)
 
             // numerische Text-States aus bestehenden Werten befüllen
@@ -124,6 +148,11 @@ struct HouseFormView: View {
             _monthlyHoaFeesText = State(initialValue: existing.monthlyHoaFees.map { cleanString(from: $0) } ?? "")
             _insurancePerYearText = State(initialValue: existing.insurancePerYear.map { cleanString(from: $0) } ?? "")
             _maintenanceBudgetPerYearText = State(initialValue: existing.maintenanceBudgetPerYear.map { cleanString(from: $0) } ?? "")
+
+            // Nebenkosten / Struktur Text-States
+            _unitCountText = State(initialValue: existing.unitCount.map { String($0) } ?? "")
+            _operatingCostAdvanceText = State(initialValue: existing.operatingCostAdvanceTotalPerMonth.map { cleanString(from: $0) } ?? "")
+            _lastOperatingCostYearText = State(initialValue: existing.lastOperatingCostYear.map { String($0) } ?? "")
         }
     }
 
@@ -133,12 +162,8 @@ struct HouseFormView: View {
 
             ScrollView {
                 VStack(spacing: 16) {
-                    objectSection
-                    usageSection
-                    energyProfileSection
-                    securitySection
-                    heatingSection
-                    maintenanceSection
+                    basicInfoSection
+                    energySecuritySection
                     financeSection
                 }
                 .padding(.horizontal, PhasirDesign.screenPadding)
@@ -166,149 +191,159 @@ struct HouseFormView: View {
 
     // MARK: - Sections
 
-    private var objectSection: some View {
+    // Neue Sektion: Grunddaten (Objekt, Nutzung, Wohn-/Energieprofil)
+    private var basicInfoSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Objekt")
+            Text("Objekt & Nutzung")
                 .font(.phasirSectionTitle)
 
+            // Objektinformationen
             VStack(spacing: 10) {
+
                 TextField("Name der Immobilie", text: $request.name)
-                    .textFieldStylePhasir()
                     .textInputAutocapitalization(.words)
+                    .phasirInputStyle()
 
                 TextField("Adresse", text: $request.address)
-                    .textFieldStylePhasir()
                     .textInputAutocapitalization(.words)
+                    .phasirInputStyle()
 
                 TextField("Eigentümer (optional)", text: $request.ownerName)
-                    .textFieldStylePhasir()
                     .textInputAutocapitalization(.words)
+                    .phasirInputStyle()
 
                 Stepper("Baujahr: \(request.buildYear)", value: $request.buildYear, in: 1800...2100)
                     .font(.subheadline)
             }
-        }
-        .phasirCard()
-    }
 
-    private var usageSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Nutzung")
-                .font(.phasirSectionTitle)
+            Divider().padding(.vertical, 8)
 
-            VStack(alignment: .leading, spacing: 10) {
-                Picker("Nutzung", selection: Binding($request.usageType, "Eigenbedarf")) {
+            // Nutzungstyp
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Nutzung")
+                    .font(.caption)
+                    .foregroundColor(Color.phasirSecondaryText)
+
+                Picker("", selection: Binding($request.usageType, "Eigenbedarf")) {
                     ForEach(usageTypes, id: \.self) { type in
-                        Text(type).tag(Optional(type))
+                        Text(type).tag(type)
                     }
                 }
                 .pickerStyle(.segmented)
+                .padding(4)
+                .background(Color.phasirCard.opacity(0.06))
+                .cornerRadius(8)
 
                 Text("Diese Information hilft Phasir, Energie-, Sicherheits- und Finanzempfehlungen auf Eigenbedarf oder Vermietung zuzuschneiden.")
                     .font(.caption)
                     .foregroundColor(Color.phasirSecondaryText)
             }
-        }
-        .phasirCard()
-    }
 
-    private var energyProfileSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Wohn- & Energieprofil")
-                .font(.phasirSectionTitle)
+            Divider().padding(.vertical, 8)
 
-            VStack(spacing: 10) {
+            // Wohn- & Energieprofil
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Wohn- & Energieprofil")
+                    .font(.caption)
+                    .foregroundColor(Color.phasirSecondaryText)
+
                 TextField("Wohnfläche (m²)", text: $livingAreaText)
                     .keyboardType(.numberPad)
-                    .textFieldStylePhasir()
+                    .phasirInputStyle()
 
                 TextField("Anzahl Bewohner", text: $residentsCountText)
                     .keyboardType(.numberPad)
-                    .textFieldStylePhasir()
+                    .phasirInputStyle()
 
                 TextField("Haustyp (z.B. EFH, MFH, Wohnung)", text: Binding($request.propertyType, ""))
-                    .textFieldStylePhasir()
+                    .phasirInputStyle()
 
                 TextField("Dämmstandard (z.B. KfW, unsaniert, gut gedämmt)", text: Binding($request.insulationLevel, ""))
-                    .textFieldStylePhasir()
+                    .phasirInputStyle()
 
                 TextField("Fensterverglasung (z.B. zweifach, dreifach)", text: Binding($request.windowGlazing, ""))
-                    .textFieldStylePhasir()
+                    .phasirInputStyle()
 
                 Toggle("PV-/Solaranlage vorhanden", isOn: Binding($request.hasSolarPanels, false))
+                    .toggleStyle(SwitchToggleStyle(tint: Color.phasirAccent))
 
                 TextField("Energieausweis-Klasse (z.B. A+, B, C)", text: Binding($request.energyCertificateClass, ""))
-                    .textFieldStylePhasir()
+                    .phasirInputStyle()
 
                 TextField("Jahresverbrauch (kWh, geschätzt)", text: $estimatedAnnualEnergyConsumptionText)
                     .keyboardType(.decimalPad)
-                    .textFieldStylePhasir()
+                    .phasirInputStyle()
 
                 TextField("Komfortpräferenz (z.B. eher warm, neutral)", text: Binding($request.comfortPreference, ""))
-                    .textFieldStylePhasir()
+                    .phasirInputStyle()
             }
         }
         .phasirCard()
     }
 
-    private var securitySection: some View {
+    // Neue Sektion: Sicherheit & Technik (Sicherheitsprofil, Heizung & Wartung)
+    private var energySecuritySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Sicherheitsprofil")
+            Text("Sicherheit & Technik")
                 .font(.phasirSectionTitle)
 
-            VStack(spacing: 10) {
+            // Sicherheitsprofil
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Sicherheitsprofil")
+                    .font(.caption)
+                    .foregroundColor(Color.phasirSecondaryText)
+
                 TextField("Haustür-Sicherheit (z.B. RC2, Mehrfachverriegelung)", text: Binding($request.doorSecurityLevel, ""))
-                    .textFieldStylePhasir()
+                    .phasirInputStyle()
 
                 Toggle("Fenstersicherungen im Erdgeschoss", isOn: Binding($request.hasGroundFloorWindowSecurity, false))
+                    .toggleStyle(SwitchToggleStyle(tint: Color.phasirAccent))
                 Toggle("Alarmanlage vorhanden", isOn: Binding($request.hasAlarmSystem, false))
+                    .toggleStyle(SwitchToggleStyle(tint: Color.phasirAccent))
                 Toggle("Kameras / Videoüberwachung", isOn: Binding($request.hasCameras, false))
+                    .toggleStyle(SwitchToggleStyle(tint: Color.phasirAccent))
                 Toggle("Außenbeleuchtung mit Bewegungsmelder", isOn: Binding($request.hasMotionLightsOutside, false))
+                    .toggleStyle(SwitchToggleStyle(tint: Color.phasirAccent))
                 Toggle("Rauchmelder in allen relevanten Räumen", isOn: Binding($request.hasSmokeDetectorsAllRooms, false))
+                    .toggleStyle(SwitchToggleStyle(tint: Color.phasirAccent))
                 Toggle("CO₂ / CO-Melder vorhanden", isOn: Binding($request.hasCO2Detector, false))
+                    .toggleStyle(SwitchToggleStyle(tint: Color.phasirAccent))
 
                 TextField("Nachbarschafts-Risiko (z.B. niedrig, mittel, hoch)", text: Binding($request.neighbourhoodRiskLevel, ""))
-                    .textFieldStylePhasir()
+                    .phasirInputStyle()
             }
-        }
-        .phasirCard()
-    }
 
-    private var heatingSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Heizung")
-                .font(.phasirSectionTitle)
+            Divider().padding(.vertical, 8)
 
-            VStack(spacing: 10) {
+            // Heizung & Wartung
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Heizung & Wartung")
+                    .font(.caption)
+                    .foregroundColor(Color.phasirSecondaryText)
+
+                // Heizung
                 Picker("Heizungstyp", selection: $request.heatingType) {
                     ForEach(heatingTypes, id: \.self) { type in
                         Text(type).tag(type)
                     }
                 }
 
-                Stepper("Heizung Einbaujahr: \(request.heatingInstallYear)",
-                        value: $request.heatingInstallYear,
-                        in: 1900...2100)
+                Stepper("Heizung Einbaujahr: \(request.heatingInstallYear)", value: $request.heatingInstallYear, in: 1900...2100)
 
                 DatePicker(
                     "Letzte Heizungswartung",
                     selection: Binding($request.lastHeatingService, Date()),
                     displayedComponents: .date
                 )
-            }
-        }
-        .phasirCard()
-    }
 
-    private var maintenanceSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Dach, Fenster & Rauchmelder")
-                .font(.phasirSectionTitle)
+                Divider().padding(.vertical, 8)
 
-            VStack(spacing: 10) {
-                Stepper("Dach Einbaujahr: \(request.roofInstallYear)",
-                        value: $request.roofInstallYear,
-                        in: 1900...2100)
+                // Dach, Fenster & Rauchmelder
+                Text("Dach, Fenster & Rauchmelder")
+                    .font(.caption)
+                    .foregroundColor(Color.phasirSecondaryText)
+
+                Stepper("Dach Einbaujahr: \(request.roofInstallYear)", value: $request.roofInstallYear, in: 1900...2100)
 
                 DatePicker(
                     "Letzte Dachprüfung",
@@ -316,9 +351,7 @@ struct HouseFormView: View {
                     displayedComponents: .date
                 )
 
-                Stepper("Fenster Einbaujahr: \(request.windowInstallYear)",
-                        value: $request.windowInstallYear,
-                        in: 1900...2100)
+                Stepper("Fenster Einbaujahr: \(request.windowInstallYear)", value: $request.windowInstallYear, in: 1900...2100)
 
                 DatePicker(
                     "Letzte Rauchmelderprüfung",
@@ -330,14 +363,13 @@ struct HouseFormView: View {
         .phasirCard()
     }
 
+    // Neue Sektion: Finanzen & Nebenkosten
     private var financeSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Finanzen (optional)")
-                    .font(.phasirSectionTitle)
-                Spacer()
-            }
+            Text("Finanzen & Nebenkosten (optional)")
+                .font(.phasirSectionTitle)
 
+            // Finanzielle Details
             DisclosureGroup(isExpanded: $isFinanceExpanded) {
                 VStack(spacing: 12) {
                     // Kauf & Finanzierung
@@ -348,24 +380,24 @@ struct HouseFormView: View {
 
                         TextField("Kaufpreis (€)", text: $purchasePriceText)
                             .keyboardType(.decimalPad)
-                            .textFieldStylePhasir()
+                            .phasirInputStyle()
 
                         TextField("Monatliche Kreditrate (€)", text: $loanMonthlyPaymentText)
                             .keyboardType(.decimalPad)
-                            .textFieldStylePhasir()
+                            .phasirInputStyle()
 
                         TextField("Verbleibende Darlehenssumme (€)", text: $remainingLoanAmountText)
                             .keyboardType(.decimalPad)
-                            .textFieldStylePhasir()
+                            .phasirInputStyle()
 
                         TextField("Zinssatz (%)", text: $interestRateText)
                             .keyboardType(.decimalPad)
-                            .textFieldStylePhasir()
+                            .phasirInputStyle()
                     }
 
                     Divider().padding(.vertical, 4)
 
-                    // Miete
+                    // Mieteinnahmen
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Mieteinnahmen (falls vermietet)")
                             .font(.caption)
@@ -373,15 +405,15 @@ struct HouseFormView: View {
 
                         TextField("Kaltmiete pro Monat (€)", text: $monthlyRentColdText)
                             .keyboardType(.decimalPad)
-                            .textFieldStylePhasir()
+                            .phasirInputStyle()
 
                         TextField("Warmmiete pro Monat (€)", text: $monthlyRentWarmText)
                             .keyboardType(.decimalPad)
-                            .textFieldStylePhasir()
+                            .phasirInputStyle()
 
                         TextField("Erwartete Leerstandsquote (%)", text: $expectedVacancyRateText)
                             .keyboardType(.decimalPad)
-                            .textFieldStylePhasir()
+                            .phasirInputStyle()
                     }
 
                     Divider().padding(.vertical, 4)
@@ -394,19 +426,19 @@ struct HouseFormView: View {
 
                         TextField("Nebenkosten (Strom, Gas, Wasser) mtl. (€)", text: $monthlyUtilitiesText)
                             .keyboardType(.decimalPad)
-                            .textFieldStylePhasir()
+                            .phasirInputStyle()
 
                         TextField("Hausgeld / WEG mtl. (€)", text: $monthlyHoaFeesText)
                             .keyboardType(.decimalPad)
-                            .textFieldStylePhasir()
+                            .phasirInputStyle()
 
                         TextField("Versicherung pro Jahr (€)", text: $insurancePerYearText)
                             .keyboardType(.decimalPad)
-                            .textFieldStylePhasir()
+                            .phasirInputStyle()
 
                         TextField("Wartungsbudget pro Jahr (€)", text: $maintenanceBudgetPerYearText)
                             .keyboardType(.decimalPad)
-                            .textFieldStylePhasir()
+                            .phasirInputStyle()
                     }
 
                     Text("Du kannst diesen Bereich auch komplett leer lassen. Je mehr du angibst, desto genauer werden Cashflow-, Rendite- und Finanz-Insights.")
@@ -428,6 +460,83 @@ struct HouseFormView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.2), value: isFinanceExpanded)
+
+            Divider().padding(.vertical, 4)
+
+            // Nebenkosten & Struktur
+            DisclosureGroup(isExpanded: $isCostExpanded) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Abrechnungsmodell")
+                        .font(.caption)
+                        .foregroundColor(Color.phasirSecondaryText)
+
+                    Picker("", selection: Binding($request.billingModel, "single")) {
+                        Text("Einfamilienhaus").tag("single")
+                        Text("Mehrfamilienhaus").tag("multi")
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(4)
+                    .background(Color.phasirCard.opacity(0.06))
+                    .cornerRadius(8)
+
+                    HStack(alignment: .center, spacing: 12) {
+                        TextField("Anzahl Einheiten", text: $unitCountText)
+                            .keyboardType(.numberPad)
+                            .phasirInputStyle()
+                        Toggle("Gewerbeeinheit", isOn: Binding($request.hasCommercialUnit, false))
+                            .toggleStyle(SwitchToggleStyle(tint: Color.phasirAccent))
+                    }
+
+                    Text("Umlageschlüssel")
+                        .font(.caption)
+                        .foregroundColor(Color.phasirSecondaryText)
+                    Picker("", selection: Binding($request.primaryOperatingCostKey, "sqm")) {
+                        Text("Wohnfläche").tag("sqm")
+                        Text("Personen").tag("people")
+                        Text("Einheiten").tag("units")
+                        Text("Verbrauch").tag("consumption")
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(4)
+                    .background(Color.phasirCard.opacity(0.06))
+                    .cornerRadius(8)
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Toggle("Hausmeisterservice", isOn: Binding($request.hasCaretakerService, false))
+                        Toggle("Gartenpflege", isOn: Binding($request.hasGardenService, false))
+                        Toggle("Aufzug vorhanden", isOn: Binding($request.hasElevator, false))
+                        Toggle("Allgemeinstrom", isOn: Binding($request.hasCommonElectricity, false))
+                        Toggle("Garage / Stellplatz", isOn: Binding($request.hasGarageOrParking, false))
+                        Toggle("Heizkostenzähler pro Einheit", isOn: Binding($request.hasHeatMeterPerUnit, false))
+                        Toggle("Wasserkostenzähler pro Einheit", isOn: Binding($request.hasWaterMeterPerUnit, false))
+                    }
+                    .toggleStyle(SwitchToggleStyle(tint: Color.phasirAccent))
+
+                    TextField("BK-Vorauszahlung (€ mtl.)", text: $operatingCostAdvanceText)
+                        .keyboardType(.decimalPad)
+                        .phasirInputStyle()
+
+                    TextField("Letzte Nebenkostenabrechnung (Jahr)", text: $lastOperatingCostYearText)
+                        .keyboardType(.numberPad)
+                        .phasirInputStyle()
+
+                    TextField("Notizen (optional)", text: Binding($request.operatingCostNotes, ""))
+                        .phasirInputStyle()
+                }
+                .padding(.top, 8)
+            } label: {
+                HStack {
+                    Text(isCostExpanded ? "Nebenkosten ausblenden" : "Nebenkosten hinzufügen")
+                        .font(.subheadline)
+                        .foregroundColor(Color.phasirAccent)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .rotationEffect(.degrees(isCostExpanded ? 180 : 0))
+                        .foregroundColor(Color.phasirAccent)
+                        .font(.caption)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: isCostExpanded)
         }
         .phasirCard()
     }
@@ -470,6 +579,18 @@ struct HouseFormView: View {
         request.monthlyHoaFees = parseDouble(monthlyHoaFeesText)
         request.insurancePerYear = parseDouble(insurancePerYearText)
         request.maintenanceBudgetPerYear = parseDouble(maintenanceBudgetPerYearText)
+
+        // Nebenkosten / Struktur Felder
+        // unitCount (Int?)
+        let unitTrimmed = unitCountText.trimmingCharacters(in: .whitespaces)
+        request.unitCount = Int(unitTrimmed)
+
+        // operatingCostAdvanceTotalPerMonth (Double?)
+        request.operatingCostAdvanceTotalPerMonth = parseDouble(operatingCostAdvanceText)
+
+        // lastOperatingCostYear (Int?)
+        let lastYearTrimmed = lastOperatingCostYearText.trimmingCharacters(in: .whitespaces)
+        request.lastOperatingCostYear = Int(lastYearTrimmed)
     }
 
     private func parseDouble(_ text: String) -> Double? {
@@ -524,5 +645,31 @@ private extension Binding where Value == Bool {
                 source.wrappedValue = newValue
             }
         )
+    }
+}
+
+// MARK: - Global extensions for Phasir input styling
+
+/// Provides a custom input style modifier for text fields and other inputs used throughout the form.
+extension View {
+    func phasirInputStyle() -> some View {
+        self.modifier(PhasirInputStyle())
+    }
+}
+
+// MARK: - Global Phasir input style definition
+
+/// A custom modifier that gives inputs a distinctive Phasir appearance.
+/// It adds padding, a subtle background, a faint stroke and rounded corners.
+fileprivate struct PhasirInputStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(12)
+            .background(Color.phasirCard.opacity(0.08))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.phasirAccent.opacity(0.25), lineWidth: 1)
+            )
+            .cornerRadius(10)
     }
 }
