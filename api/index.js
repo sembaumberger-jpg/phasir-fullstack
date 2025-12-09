@@ -7,8 +7,7 @@ import { v4 as uuid } from 'uuid';
 import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
 import bcrypt from 'bcryptjs'; // 🔐 Passwort-Hashing
-import jwt from 'jsonwebtoken';
-
+import jwt from 'jsonwebtoken'; // 🪪 JSON Web Tokens for sessions
 
 const PORT = process.env.PORT || 4000;
 const app = express();
@@ -31,10 +30,12 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase =
   supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 const SUPABASE_TABLE = 'houses';
+// Name of the user table; configurable via environment variables
 const USER_TABLE = process.env.SUPABASE_USER_TABLE || 'phasir_users';
+// Secret used to sign JWTs; set via environment in production
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+// How long issued tokens are valid
 const TOKEN_EXPIRES_IN = '30d';
-
 
 app.use(cors());
 app.use(express.json());
@@ -46,10 +47,16 @@ const intervals = {
   smoke: 1,
 };
 
-// 🧑‍💻 User-Management (Supabase + Fallback)
-
+// ----- User Management -----
+// In-memory user storage used when Supabase is not configured. Each entry has {id, email, passwordHash, createdAt}.
 const fallbackUsers = [];
 
+/**
+ * Convert a user row from Supabase into our internal user representation.
+ *
+ * @param {object} row - Row from Supabase.
+ * @returns {{id: string, email: string, passwordHash: string, createdAt: string}}
+ */
 const mapUserRowFromSupabase = (row) => ({
   id: row.id,
   email: row.email,
@@ -57,31 +64,40 @@ const mapUserRowFromSupabase = (row) => ({
   createdAt: row.createdat,
 });
 
+/**
+ * Find a user by their email. Normalizes email to lowercase before lookup.
+ * Returns null if no user is found.
+ *
+ * @param {string} email
+ * @returns {Promise<object|null>}
+ */
 const findUserByEmail = async (email) => {
   const normalized = String(email).trim().toLowerCase();
-
   if (!supabase) {
     return fallbackUsers.find((u) => u.email === normalized) || null;
   }
-
   const { data, error } = await supabase
     .from(USER_TABLE)
     .select('*')
     .eq('email', normalized)
     .limit(1);
-
   if (error) {
     console.error('❌ Supabase findUserByEmail failed:', error);
     throw new Error('Database error');
   }
-
   if (!data || data.length === 0) return null;
   return mapUserRowFromSupabase(data[0]);
 };
 
+/**
+ * Create a new user with the provided email and password hash.
+ * Stores in Supabase if configured, otherwise uses fallback in-memory storage.
+ *
+ * @param {{email: string, passwordHash: string}} param0
+ * @returns {Promise<object>} Newly created user.
+ */
 const createUser = async ({ email, passwordHash }) => {
   const normalized = String(email).trim().toLowerCase();
-
   if (!supabase) {
     const user = {
       id: uuid(),
@@ -92,33 +108,36 @@ const createUser = async ({ email, passwordHash }) => {
     fallbackUsers.push(user);
     return user;
   }
-
   const insertPayload = {
     id: uuid(),
     email: normalized,
     passwordhash: passwordHash,
     createdat: new Date().toISOString(),
   };
-
   const { data, error } = await supabase
     .from(USER_TABLE)
     .insert(insertPayload)
     .select()
     .single();
-
   if (error) {
     console.error('❌ Supabase createUser failed:', error);
     throw new Error('Database error');
   }
-
   return mapUserRowFromSupabase(data);
 };
 
+/**
+ * Generate a signed JWT for the given user. The token contains the userId and
+ * expires after a configured duration.
+ *
+ * @param {{id: string}} user
+ * @returns {string} Signed JWT
+ */
 const createSessionToken = (user) => {
   return jwt.sign(
     { userId: user.id },
     JWT_SECRET,
-    { expiresIn: TOKEN_EXPIRES_IN }
+    { expiresIn: TOKEN_EXPIRES_IN },
   );
 };
 
@@ -197,7 +216,19 @@ const houses = [
     windowInstallYear: 2017,
     lastSmokeCheck: new Date('2024-04-09'),
   },
-]; 
+];
+
+// 🧑‍💻 In-Memory-User (für Entwicklung)
+// Achtung: wird bei jedem Server-Neustart zurückgesetzt.
+// Passwort für Demo-User: "test1234"
+const users = [
+  {
+    id: uuid(),
+    email: 'demo@phasir.app',
+    passwordHash: bcrypt.hashSync('test1234', 10),
+    createdAt: new Date().toISOString(),
+  },
+];
 
 // 👉 Mapping: Supabase-Row -> internes House-Objekt (camelCase)
 const fromSupabaseRow = (row) => ({
@@ -259,6 +290,23 @@ const fromSupabaseRow = (row) => ({
   remainingLoanAmount: row.remainingloanamount ?? null,
   interestRate: row.interestrate ?? null,
   loanMonthlyPayment: row.loanmonthlypayment ?? null,
+
+  // --- Nebenkosten & Struktur ---
+  billingModel: row.billingmodel ?? null, // 'single' | 'multi'
+  unitCount: row.unitcount ?? null,
+  hasCommercialUnit: row.hascommercialunit ?? null,
+  primaryOperatingCostKey: row.primaryoperatingcostkey ?? null, // 'sqm' | 'people' | 'units' | 'consumption'
+  hasCaretakerService: row.hascaretakerservice ?? null,
+  hasGardenService: row.hasgardenservice ?? null,
+  hasElevator: row.haselevator ?? null,
+  hasCommonElectricity: row.hascommonelectricity ?? null,
+  hasGarageOrParking: row.hasgarageorparking ?? null,
+  hasHeatMeterPerUnit: row.hasheatmeterperunit ?? null,
+  hasWaterMeterPerUnit: row.haswatermeterperunit ?? null,
+  operatingCostAdvanceTotalPerMonth:
+    row.operatingcostadvancetotalpermonth ?? null,
+  lastOperatingCostYear: row.lastoperatingcostyear ?? null,
+  operatingCostNotes: row.operatingcostnotes ?? null,
 });
 
 // sorgt dafür, dass Zahlen wirklich Zahlen sind (Jahreszahlen)
@@ -268,6 +316,15 @@ const ensureHouseNumbers = (house) => ({
   heatingInstallYear: Number(house.heatingInstallYear),
   roofInstallYear: Number(house.roofInstallYear),
   windowInstallYear: Number(house.windowInstallYear),
+  // --- Nebenkosten & Struktur ---
+  unitCount:
+    house.unitCount !== undefined && house.unitCount !== null
+      ? Number(house.unitCount)
+      : null,
+  lastOperatingCostYear:
+    house.lastOperatingCostYear !== undefined && house.lastOperatingCostYear !== null
+      ? Number(house.lastOperatingCostYear)
+      : null,
 });
 
 // internes House-Objekt -> Supabase-Row
@@ -341,6 +398,23 @@ const toSupabasePayload = (house) => {
     remainingloanamount: normalized.remainingLoanAmount ?? null,
     interestrate: normalized.interestRate ?? null,
     loanmonthlypayment: normalized.loanMonthlyPayment ?? null,
+
+    // --- Nebenkosten & Struktur ---
+    billingmodel: normalized.billingModel ?? null,
+    unitcount: normalized.unitCount ?? null,
+    hascommercialunit: normalized.hasCommercialUnit ?? null,
+    primaryoperatingcostkey: normalized.primaryOperatingCostKey ?? null,
+    hascaretakerservice: normalized.hasCaretakerService ?? null,
+    hasgardenservice: normalized.hasGardenService ?? null,
+    haselevator: normalized.hasElevator ?? null,
+    hascommonelectricity: normalized.hasCommonElectricity ?? null,
+    hasgarageorparking: normalized.hasGarageOrParking ?? null,
+    hasheatmeterperunit: normalized.hasHeatMeterPerUnit ?? null,
+    haswatermeterperunit: normalized.hasWaterMeterPerUnit ?? null,
+    operatingcostadvancetotalpermonth:
+      normalized.operatingCostAdvanceTotalPerMonth ?? null,
+    lastoperatingcostyear: normalized.lastOperatingCostYear ?? null,
+    operatingcostnotes: normalized.operatingCostNotes ?? null,
   };
 };
 
@@ -944,6 +1018,29 @@ const parseHousePayload = (payload) => ({
   remainingLoanAmount: payload.remainingLoanAmount ?? null,
   interestRate: payload.interestRate ?? null,
   loanMonthlyPayment: payload.loanMonthlyPayment ?? null,
+
+  // --- Nebenkosten & Struktur ---
+  billingModel: payload.billingModel ?? null, // 'single' | 'multi'
+  unitCount:
+    payload.unitCount !== undefined && payload.unitCount !== null
+      ? Number(payload.unitCount)
+      : null,
+  hasCommercialUnit: payload.hasCommercialUnit ?? null,
+  primaryOperatingCostKey: payload.primaryOperatingCostKey ?? null, // 'sqm' | 'people' | 'units' | 'consumption'
+  hasCaretakerService: payload.hasCaretakerService ?? null,
+  hasGardenService: payload.hasGardenService ?? null,
+  hasElevator: payload.hasElevator ?? null,
+  hasCommonElectricity: payload.hasCommonElectricity ?? null,
+  hasGarageOrParking: payload.hasGarageOrParking ?? null,
+  hasHeatMeterPerUnit: payload.hasHeatMeterPerUnit ?? null,
+  hasWaterMeterPerUnit: payload.hasWaterMeterPerUnit ?? null,
+  operatingCostAdvanceTotalPerMonth:
+    payload.operatingCostAdvanceTotalPerMonth ?? null,
+  lastOperatingCostYear:
+    payload.lastOperatingCostYear !== undefined && payload.lastOperatingCostYear !== null
+      ? Number(payload.lastOperatingCostYear)
+      : null,
+  operatingCostNotes: payload.operatingCostNotes ?? null,
 });
 
 // ---------- DB Funktionen ----------
@@ -1521,41 +1618,34 @@ app.post(
   '/auth/register',
   asyncRoute(async (req, res) => {
     const { email, password } = req.body || {};
-
     if (!email || !password) {
       return res.status(400).json({
-
         error: 'E-Mail und Passwort werden benötigt.',
       });
     }
-
     const normalizedEmail = String(email).trim().toLowerCase();
 
+    // validate email format
     const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
     if (!emailRegex.test(normalizedEmail)) {
       return res.status(400).json({
         error: 'Bitte gib eine gültige E-Mail-Adresse ein.',
       });
     }
-
     if (password.length < 8) {
       return res.status(400).json({
         error: 'Passwort muss mindestens 8 Zeichen haben.',
       });
     }
-
     const existing = await findUserByEmail(normalizedEmail);
     if (existing) {
       return res.status(409).json({
         error: 'Für diese E-Mail existiert bereits ein Konto.',
       });
     }
-
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await createUser({ email: normalizedEmail, passwordHash });
-
     const token = createSessionToken(user);
-
     return res.status(201).json({
       token,
       userId: user.id,
@@ -1564,35 +1654,30 @@ app.post(
   })
 );
 
+// Login
 app.post(
   '/auth/login',
   asyncRoute(async (req, res) => {
     const { email, password } = req.body || {};
-
     if (!email || !password) {
       return res.status(400).json({
         error: 'E-Mail und Passwort werden benötigt.',
       });
     }
-
     const normalizedEmail = String(email).trim().toLowerCase();
     const user = await findUserByEmail(normalizedEmail);
-
     if (!user) {
       return res.status(401).json({
         error: 'Diese Kombination aus E-Mail und Passwort ist nicht gültig.',
       });
     }
-
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
       return res.status(401).json({
         error: 'Diese Kombination aus E-Mail und Passwort ist nicht gültig.',
       });
     }
-
     const token = createSessionToken(user);
-
     return res.json({
       token,
       userId: user.id,
@@ -1600,7 +1685,6 @@ app.post(
     });
   })
 );
-
 
 // 🆕 ---------- REAL ESTATE NEWS ENDPOINT (mit fetch) ----------
 
