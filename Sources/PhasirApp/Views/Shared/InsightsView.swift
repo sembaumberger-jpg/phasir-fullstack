@@ -1,14 +1,12 @@
 import SwiftUI
 import Charts
 
-/// TradingView-artige Insights für Phasir
-/// Dunkles, verbundenes Layout + Investment-KI für Wertsteigerung & Energiekosten.
+/// TradingView-artige Insights für Phasir – inkl. Investment-KI
 struct InsightsView: View {
     @ObservedObject var viewModel: HouseListViewModel
 
     // MARK: - Lokale Modelle
 
-    /// Vorhersage eines Wertes pro Jahr (Baseline vs. mit Invest)
     struct ValuePrediction: Identifiable {
         let id = UUID()
         let year: Int
@@ -16,9 +14,8 @@ struct InsightsView: View {
         let improved: Double
     }
 
-    /// Antwortstruktur des /ai/investment-advice Endpoints
     struct InvestmentAdviceResponse: Decodable {
-        struct Suggestion: Identifiable, Decodable {
+        struct Suggestion: Identifiable, Decodable, Equatable {
             let id = UUID()
             let name: String
             let description: String
@@ -32,6 +29,10 @@ struct InsightsView: View {
             private enum CodingKeys: String, CodingKey {
                 case name, description, type, cost, estimatedValueIncrease, estimatedAnnualSavings, paybackYears, roi10Y
             }
+
+            static func == (lhs: Suggestion, rhs: Suggestion) -> Bool {
+                lhs.id == rhs.id
+            }
         }
 
         let houseId: String?
@@ -43,29 +44,40 @@ struct InsightsView: View {
         }
     }
 
-    /// Auswahl: Gesamt-Portfolio oder einzelnes Haus
-    @State private var selectedIndex: Int = 0 // 0 = Portfolio, sonst 1...n = Hausindex + 1
+    struct SuggestionChatMessage: Identifiable {
+        let id = UUID()
+        let isUser: Bool
+        let text: String
+        let createdAt: Date = Date()
+    }
 
-    // Wert-Projektion
+    // MARK: - State
+
+    @State private var selectedIndex: Int = 0 // 0 = Portfolio, sonst Hausindex+1
+
     @State private var predictions: [ValuePrediction] = []
     @State private var baselineValue10Y: Double = 0
     @State private var improvedValue10Y: Double = 0
     @State private var deltaValue10Y: Double = 0
 
-    // Investment-KI
     @State private var investmentAdviceByHouseId: [String: InvestmentAdviceResponse] = [:]
     @State private var isLoadingInvestmentForHouseId: String?
     @State private var investmentError: String?
 
-    // Lifecycle
     @State private var hasAppeared: Bool = false
 
-    // MARK: - Farben nur für Insights (TradingView-Style)
+    // Sheet + Chat
+    @State private var activeSuggestion: InvestmentAdviceResponse.Suggestion?
+    @State private var suggestionChatMessages: [SuggestionChatMessage] = []
+    @State private var chatInput: String = ""
+    @State private var isSendingChat: Bool = false
+
+    // MARK: - Farben
 
     private enum InsightsColors {
-        static let background = Color(red: 0.03, green: 0.04, blue: 0.08)       // Tab-Hintergrund
-        static let card       = Color(red: 0.10, green: 0.12, blue: 0.20)       // große Karte
-        static let section    = Color(red: 0.14, green: 0.16, blue: 0.24)       // kleine Section-Boxen
+        static let background = Color(red: 0.03, green: 0.04, blue: 0.08)
+        static let card       = Color(red: 0.10, green: 0.12, blue: 0.20)
+        static let section    = Color(red: 0.14, green: 0.16, blue: 0.24)
         static let border     = Color.white.opacity(0.08)
         static let subtleText = Color.white.opacity(0.65)
     }
@@ -97,20 +109,19 @@ struct InsightsView: View {
         .navigationTitle("Insights")
         .navigationBarTitleDisplayMode(.large)
         .task {
-            // Houses & Benchmarks laden
             if viewModel.houses.isEmpty {
                 await viewModel.load()
             }
             await viewModel.loadRentBenchmark()
-
-            // Erste Auswahl initial berechnen
             await recalcForCurrentSelection()
             hasAppeared = true
         }
         .onChange(of: selectedIndex) { _ in
-            Task {
-                await recalcForCurrentSelection()
-            }
+            Task { await recalcForCurrentSelection() }
+        }
+        // SHEET: Detailansicht + Chat für ausgewählte Investition
+        .sheet(item: $activeSuggestion) { suggestion in
+            suggestionDetailSheet(for: suggestion)
         }
     }
 
@@ -120,7 +131,6 @@ struct InsightsView: View {
         viewModel.houses
     }
 
-    /// Aktuell gewähltes Haus (für die KI); bei Portfolio Auswahl -> erstes Haus
     private var currentHouse: House? {
         guard !houses.isEmpty else { return nil }
         if selectedIndex <= 0 { return houses.first }
@@ -129,7 +139,6 @@ struct InsightsView: View {
         return houses[idx]
     }
 
-    /// Titel (Portfolio oder Hausname)
     private var selectionTitle: String {
         if selectedIndex == 0 {
             return "Portfolio gesamt"
@@ -175,23 +184,17 @@ struct InsightsView: View {
         }
     }
 
-    // MARK: - Auswahl Portfolio / Häuser
+    // MARK: - Auswahl-Chips
 
     private var selectionChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                chip(
-                    title: "Portfolio",
-                    isSelected: selectedIndex == 0
-                ) {
+                chip(title: "Portfolio", isSelected: selectedIndex == 0) {
                     selectedIndex = 0
                 }
 
                 ForEach(Array(houses.enumerated()), id: \.1.id) { index, house in
-                    chip(
-                        title: house.name,
-                        isSelected: selectedIndex == index + 1
-                    ) {
+                    chip(title: house.name, isSelected: selectedIndex == index + 1) {
                         selectedIndex = index + 1
                     }
                 }
@@ -214,11 +217,7 @@ struct InsightsView: View {
             .padding(.horizontal, 12)
             .background(
                 Capsule()
-                    .fill(
-                        isSelected
-                        ? Color.phasirAccent
-                        : InsightsColors.section
-                    )
+                    .fill(isSelected ? Color.phasirAccent : InsightsColors.section)
             )
             .overlay(
                 Capsule()
@@ -229,11 +228,10 @@ struct InsightsView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Hauptkarte (TradingView-Style)
+    // MARK: - Hauptkarte
 
     private var mainCard: some View {
         VStack(alignment: .leading, spacing: 18) {
-            // Kopfzeile der Karte
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(selectionTitle)
@@ -257,13 +255,8 @@ struct InsightsView: View {
                 }
             }
 
-            // Chart
             valueChart
-
-            // KPI-Reihe unter dem Chart
             kpiRow
-
-            // Investment-KI-Sektion
             investmentSection
         }
         .padding(18)
@@ -287,7 +280,6 @@ struct InsightsView: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white)
                 Spacer()
-
                 HStack(spacing: 12) {
                     legendDot(color: Color.white.opacity(0.8), label: "Baseline")
                     legendDot(color: Color.phasirAccent, label: "Mit Sanierung")
@@ -314,11 +306,11 @@ struct InsightsView: View {
                     )
                     .foregroundStyle(Color.phasirAccent)
                     .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    // wichtig: kein .symbol mit StrokeBorder-View mehr
                 }
                 .chartXAxis {
                     AxisMarks(position: .bottom) { value in
-                        AxisGridLine()
-                            .foregroundStyle(InsightsColors.border)
+                        AxisGridLine().foregroundStyle(InsightsColors.border)
                         AxisValueLabel {
                             if let year = value.as(Int.self) {
                                 Text("+\(year)J")
@@ -330,8 +322,7 @@ struct InsightsView: View {
                 }
                 .chartYAxis {
                     AxisMarks(position: .leading) { value in
-                        AxisGridLine()
-                            .foregroundStyle(InsightsColors.border.opacity(0.8))
+                        AxisGridLine().foregroundStyle(InsightsColors.border.opacity(0.8))
                         AxisValueLabel {
                             if let number = value.as(Double.self) {
                                 Text(shortCurrency(number))
@@ -357,7 +348,7 @@ struct InsightsView: View {
         }
     }
 
-    // MARK: - KPI-Reihe
+    // MARK: - KPIs
 
     private var kpiRow: some View {
         HStack(spacing: 14) {
@@ -375,7 +366,8 @@ struct InsightsView: View {
             )
 
             let delta = deltaValue10Y
-            let sign = delta >= 0 ? "+" : "–"
+            let sign = delta >= 0 ? "+"
+                                   : "–"
             let absDelta = abs(delta)
 
             kpiBox(
@@ -421,7 +413,7 @@ struct InsightsView: View {
         )
     }
 
-    // MARK: - Investment-KI Sektion
+    // MARK: - Investment-Sektion
 
     private var investmentSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -442,6 +434,7 @@ struct InsightsView: View {
 
             if let house = currentHouse,
                let advice = investmentAdviceByHouseId[house.id] {
+
                 if let summary = advice.summary, !summary.isEmpty {
                     Text(summary)
                         .font(.system(size: 12))
@@ -464,7 +457,7 @@ struct InsightsView: View {
             } else if let error = investmentError {
                 Text(error)
                     .font(.system(size: 12))
-                    .foregroundColor(.red.opacity(0.8))
+                    .foregroundColor(.red.opacity(0.85))
             } else {
                 Text("Wähle ein Objekt, damit Phasir dir konkrete Maßnahmen mit Wert- und Energie-Effekt vorschlägt.")
                     .font(.system(size: 12))
@@ -534,10 +527,25 @@ struct InsightsView: View {
                 }
                 if let roi = s.roi10Y {
                     let percent = roi * 100
-                    let signColor: Color = percent >= 0 ? Color.phasirAccent : .red.opacity(0.8)
-                    miniMetric(title: "ROI (10J)", value: String(format: "%.0f %%", percent), color: signColor)
+                    let color: Color = percent >= 0 ? Color.phasirAccent : .red.opacity(0.85)
+                    miniMetric(title: "ROI (10J)", value: String(format: "%.0f %%", percent), color: color)
                 }
             }
+
+            // Button für Detail-Topup
+            Button {
+                openDetail(for: s)
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Jetzt mehr erfahren")
+                        .font(.system(size: 12, weight: .semibold))
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .foregroundColor(Color.phasirAccent)
+                .padding(.top, 4)
+            }
+            .buttonStyle(.plain)
         }
         .padding(10)
         .background(
@@ -578,9 +586,8 @@ struct InsightsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Logik: Werte & KI Laden
+    // MARK: - Logik
 
-    /// Rechnet Chart + lädt KI für die aktuelle Auswahl
     private func recalcForCurrentSelection() async {
         computePredictions()
 
@@ -595,10 +602,8 @@ struct InsightsView: View {
         deltaValue10Y = 0
 
         let baseValue: Double
-
         if selectedIndex == 0 {
-            // Portfolio: Summe aller Kaufpreise
-            baseValue = houses.reduce(0) { $0 + (purchasePrice(for: $1)) }
+            baseValue = houses.reduce(0) { $0 + purchasePrice(for: $1) }
         } else if let house = currentHouse {
             baseValue = purchasePrice(for: house)
         } else {
@@ -607,10 +612,8 @@ struct InsightsView: View {
 
         guard baseValue > 0 else { return }
 
-        // Baseline: 2 % p.a. Wertsteigerung
         let baselineGrowth: Double = 0.02
 
-        // Investment-Boost aus bester KI-Empfehlung (falls vorhanden)
         let boost: Double
         if let house = currentHouse,
            let advice = investmentAdviceByHouseId[house.id] {
@@ -621,14 +624,10 @@ struct InsightsView: View {
         }
 
         var result: [ValuePrediction] = []
-
         for year in 0...10 {
             let baseline = baseValue * pow(1.0 + baselineGrowth, Double(year))
-
-            // Boost linear bis Jahr 10 einlaufen lassen, damit die Kurve „realistisch“ wirkt
             let factor = Double(year) / 10.0
             let improved = baseline + boost * factor
-
             result.append(ValuePrediction(year: year, baseline: baseline, improved: improved))
         }
 
@@ -642,11 +641,8 @@ struct InsightsView: View {
         house.purchasePrice ?? 0
     }
 
-    /// Holt Investment-Advice vom Backend, aber nur einmal pro Haus (Caching)
     private func loadInvestmentAdviceIfNeeded(for house: House) async {
-        if investmentAdviceByHouseId[house.id] != nil {
-            return
-        }
+        if investmentAdviceByHouseId[house.id] != nil { return }
 
         isLoadingInvestmentForHouseId = house.id
         investmentError = nil
@@ -658,9 +654,7 @@ struct InsightsView: View {
         }
 
         do {
-            guard let url = URL(string: "https://phasir-fullstack-production.up.railway.app/ai/investment-advice") else {
-                return
-            }
+            guard let url = URL(string: "https://phasir-fullstack-production.up.railway.app/ai/investment-advice") else { return }
 
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
@@ -681,8 +675,6 @@ struct InsightsView: View {
             let advice = try decoder.decode(InvestmentAdviceResponse.self, from: data)
 
             investmentAdviceByHouseId[house.id] = advice
-
-            // nach neuem Advice nochmal Kurve neu rechnen (Boost)
             computePredictions()
         } catch {
             print("❌ Investment-KI Request fehlgeschlagen:", error)
@@ -690,7 +682,210 @@ struct InsightsView: View {
         }
     }
 
-    // MARK: - Format Helper
+    // MARK: - Sheet / Chat
+
+    private func openDetail(for suggestion: InvestmentAdviceResponse.Suggestion) {
+        suggestionChatMessages = []
+        chatInput = ""
+        activeSuggestion = suggestion
+
+        // initiale ausführliche Erklärung holen
+        Task {
+            await sendSuggestionQuestion(
+                "Gib mir eine ausführliche, praxisnahe Schritt-für-Schritt-Erklärung, wie ich diese Maßnahme in der Praxis umsetzen kann – inklusive Kostenrisiken, typischem Ablauf und worauf ich als privater Eigentümer achten muss.",
+                for: suggestion
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func suggestionDetailSheet(for suggestion: InvestmentAdviceResponse.Suggestion) -> some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(suggestion.name)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white)
+
+                        if !suggestion.description.isEmpty {
+                            Text(suggestion.description)
+                                .font(.system(size: 13))
+                                .foregroundColor(InsightsColors.subtleText)
+                        }
+
+                        if let houseName = currentHouse?.name {
+                            Text("Objekt: \(houseName)")
+                                .font(.system(size: 12))
+                                .foregroundColor(InsightsColors.subtleText)
+                        }
+
+                        Divider()
+                            .background(InsightsColors.border)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Phasir KI-Einschätzung")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+
+                            if suggestionChatMessages.isEmpty && isSendingChat {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                    Text("KI analysiert diese Maßnahme …")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(InsightsColors.subtleText)
+                                }
+                            } else if suggestionChatMessages.isEmpty {
+                                Text("Stelle der KI Fragen zu Umsetzung, Kosten, Risiken oder Förderungen.")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(InsightsColors.subtleText)
+                            } else {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    ForEach(suggestionChatMessages) { msg in
+                                        HStack {
+                                            if msg.isUser {
+                                                Spacer()
+                                                Text(msg.text)
+                                                    .padding(8)
+                                                    .background(
+                                                        RoundedRectangle(cornerRadius: 12)
+                                                            .fill(Color.phasirAccent.opacity(0.9))
+                                                    )
+                                                    .foregroundColor(.white)
+                                                    .font(.system(size: 12))
+                                            } else {
+                                                Text(msg.text)
+                                                    .padding(8)
+                                                    .background(
+                                                        RoundedRectangle(cornerRadius: 12)
+                                                            .fill(InsightsColors.section)
+                                                    )
+                                                    .foregroundColor(.white)
+                                                    .font(.system(size: 12))
+                                                Spacer()
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(16)
+                }
+
+                Divider()
+                    .background(InsightsColors.border)
+
+                HStack(spacing: 8) {
+                    TextField("Frage an die Phasir-KI …", text: $chatInput, axis: .vertical)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 13))
+                        .lineLimit(1...3)
+
+                    Button {
+                        let text = chatInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !text.isEmpty else { return }
+                        chatInput = ""
+                        Task {
+                            await sendSuggestionQuestion(text, for: suggestion)
+                        }
+                    } label: {
+                        if isSendingChat {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        } else {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(Color.phasirAccent)
+                        }
+                    }
+                    .disabled(isSendingChat)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(InsightsColors.background)
+            }
+            .background(InsightsColors.background.ignoresSafeArea())
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Schließen") {
+                        activeSuggestion = nil
+                    }
+                }
+            }
+        }
+    }
+
+    private func sendSuggestionQuestion(_ text: String, for suggestion: InvestmentAdviceResponse.Suggestion) async {
+        guard let house = currentHouse else { return }
+
+        await MainActor.run {
+            suggestionChatMessages.append(
+                SuggestionChatMessage(isUser: true, text: text)
+            )
+            isSendingChat = true
+        }
+
+        defer {
+            Task { await MainActor.run { isSendingChat = false } }
+        }
+
+        guard let url = URL(string: "https://phasir-fullstack-production.up.railway.app/ai/investment-advice/chat") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let historyPayload = suggestionChatMessages.map { msg in
+            [
+                "role": msg.isUser ? "user" : "assistant",
+                "content": msg.text
+            ]
+        }
+
+        let payload: [String: Any] = [
+            "houseId": house.id,
+            "suggestionName": suggestion.name,
+            "question": text,
+            "history": historyPayload
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: payload, options: [])
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse,
+               !(200..<300).contains(http.statusCode) {
+                throw NSError(domain: "SuggestionChat", code: http.statusCode, userInfo: nil)
+            }
+
+            struct ChatResponse: Decodable {
+                let answer: String
+            }
+
+            let decoded = try JSONDecoder().decode(ChatResponse.self, from: data)
+            let answerText = decoded.answer.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            await MainActor.run {
+                suggestionChatMessages.append(
+                    SuggestionChatMessage(isUser: false, text: answerText)
+                )
+            }
+        } catch {
+            print("❌ Fehler im Suggestion-Chat:", error)
+            await MainActor.run {
+                suggestionChatMessages.append(
+                    SuggestionChatMessage(
+                        isUser: false,
+                        text: "Die KI konnte gerade nicht antworten. Bitte versuche es später erneut."
+                    )
+                )
+            }
+        }
+    }
+
+    // MARK: - Formatting
 
     private func formatCurrency(_ value: Double) -> String {
         let formatter = NumberFormatter()
@@ -700,10 +895,8 @@ struct InsightsView: View {
         return formatter.string(from: NSNumber(value: value)) ?? "€\(Int(value))"
     }
 
-    /// Kürzere Darstellung im Chart (z. B. 250.000 € → 250k)
     private func shortCurrency(_ value: Double) -> String {
         let absVal = abs(value)
-
         let formatter = NumberFormatter()
         formatter.locale = Locale(identifier: "de_DE")
         formatter.numberStyle = .currency

@@ -1528,6 +1528,105 @@ app.post(
     });
   })
 );
+
+// 🧠 ---------- INVESTMENT-CHAT ZU EINZELNEN MASSNAHMEN ----------
+
+app.post(
+  '/ai/investment-advice/chat',
+  asyncRoute(async (req, res) => {
+    const { houseId, suggestionName, question, history } = req.body || {};
+
+    if (!question || !suggestionName) {
+      return res.status(400).json({
+        error:
+          'suggestionName und question sind erforderlich (zusätzlich optional houseId und history).',
+      });
+    }
+
+    // Haus nachladen (wenn vorhanden) – für kontextreichere Antworten
+    let house = null;
+    if (houseId) {
+      try {
+        house = await fetchHouseById(houseId);
+      } catch (err) {
+        console.warn(
+          '⚠️ Konnte Haus für /ai/investment-advice/chat nicht laden:',
+          err
+        );
+      }
+    }
+
+    // Wenn kein OpenAI-Key gesetzt ist → simpler Fallback
+    if (!openai) {
+      const fallback =
+        'Aktuell steht keine vollwertige KI-Anbindung zur Verfügung. ' +
+        'Grundsätzlich solltest du bei dieser Maßnahme Angebote von mehreren Fachbetrieben einholen, ' +
+        'auf Referenzen, Garantiebedingungen und eine saubere Fördermittelberatung achten. ' +
+        'Sprich mit deinem Energieberater und deiner Bank, um die Auswirkungen auf Finanzierung, ' +
+        'Energieausweis und zukünftige Wertentwicklung zu prüfen.';
+      return res.json({ answer: fallback });
+    }
+
+    // Verlauf übernehmen (optional) – kommt aus der App als [{role, content}, ...]
+    const historyMessages = Array.isArray(history)
+      ? history
+          .filter(
+            (m) =>
+              m &&
+              typeof m.role === 'string' &&
+              typeof m.content === 'string'
+          )
+          .map((m) => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: m.content,
+          }))
+          .slice(-10) // nur die letzten 10 Nachrichten
+      : [];
+
+    const systemPrompt =
+      'Du bist ein erfahrener Immobilien- und Energieinvestitionsberater in Deutschland. ' +
+      'Du erklärst privaten Eigentümern Schritt für Schritt, wie sie vorgeschlagene Maßnahmen ' +
+      'wie PV-Anlagen, Dämmung, Heizungsmodernisierung oder Smart-Home praktisch umsetzen können. ' +
+      'Du berücksichtigst typische Kosten, Förderungen, Ablauf (Angebote, Planung, Ausführung) ' +
+      'und nennst konkrete Tipps, worauf man bei Handwerkern, Verträgen und Garantien achten sollte. ' +
+      'Antworte immer strukturiert, klar gegliedert (z.B. mit Aufzählungen) und auf Deutsch.';
+
+    const userPrompt = `
+Ausgangssituation:
+
+- Immobilie (falls vorhanden, JSON):
+${house ? JSON.stringify(house, null, 2) : 'Keine zusätzlichen Hausdaten verfügbar.'}
+
+- Maßnahme aus der Investment-KI: "${suggestionName}"
+
+Frage des Nutzers an dich:
+"${question}"
+
+Bitte antworte:
+- sehr praxisnah und Schritt für Schritt
+- mit typischen Kosten-Spannen (in EUR) und Zeitachsen
+- mit Hinweisen zu Förderprogrammen (allgemein, ohne konkrete Programme zu nennen)
+- mit Risiken/Fallstricken und wie man sie vermeidet
+- aus Sicht eines privaten Eigentümers, der 1–3 Objekte hat.
+`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4.1-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...historyMessages,
+        { role: 'user', content: userPrompt },
+      ],
+    });
+
+    const answer =
+      completion.choices?.[0]?.message?.content?.trim() ||
+      'Die KI konnte hierzu keine genaue Einschätzung abgeben. Bitte versuche es später erneut.';
+
+    res.json({ answer });
+  })
+);
+
 // Mietspiegel / Markt-Benchmark
 app.post(
   '/ai/rent-benchmark',
